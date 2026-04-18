@@ -11,6 +11,7 @@
    getting_started/data_zipper
    getting_started/analysis
    getting_started/available_experiments
+   getting_started/stimulus_sets
 
 .. toctree::
    :caption: Experiments
