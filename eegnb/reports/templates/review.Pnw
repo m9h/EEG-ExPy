@@ -1,0 +1,476 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{caption}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage[authoryear,round]{natbib}
+
+\hypersetup{
+    colorlinks=true,
+    urlcolor=blue,
+    linkcolor=black,
+    citecolor=blue,
+}
+
+\title{Frequency-tagged visual paradigms for short, high-signal EEG:\\
+SSVEP, FPVS face individuation, and the Fastball memory assessment}
+\author{Morgan Hough\\[4pt]
+\small\texttt{eegnb.reports.build\_review}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent Three closely related EEG paradigms share a common logic:
+stimulate the visual system at a precisely fixed periodic rate, and read
+out the cortical response in the frequency domain rather than by
+trial-averaging in the time domain. Classical SSVEP, reviewed
+definitively by \citet{norcia2015jvis}, establishes the
+frequency-tagging principle and its signal-to-noise advantages. The
+Rossion laboratory's fast periodic visual stimulation
+oddball~\citep{liushuang2014} adapts the principle to probe
+category-level discrimination — most notably face individuation.
+\citet{stothart2020neuroimage,stothart2021brain,stothart2025braincomms}
+build on the same machinery to produce ``Fastball'', a clinically-oriented
+recognition-memory assay that takes under five minutes of EEG per
+subject and is already being evaluated as a pre-dementia biomarker.
+This document reviews the three paradigms, their shared methodology,
+their divergent applications, and their practical implications for
+low-cost consumer-grade EEG such as the g.tec Unicorn Hybrid Black used
+in this project.
+\end{abstract}
+
+\tableofcontents
+
+<<setup, echo=False>>=
+import numpy as np
+import matplotlib.pyplot as plt
+plt.switch_backend("Agg")
+plt.rcParams.update({
+    "font.family": "serif",
+    "axes.labelsize": 10,
+    "axes.titlesize": 11,
+    "legend.fontsize": 8,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
+})
+@
+
+\section{Introduction}
+
+\subsection{The signal-to-noise problem in EEG}
+
+Scalp EEG recovers signals of the order of 1--50~\textmu{}V
+from an envelope of 10--100~\textmu{}V of background
+activity and movement artifact. The dominant strategy for isolating a
+cognitive signal is time-domain averaging: present a stimulus many
+times, epoch the EEG, and average the epochs. Signal-to-noise ratio
+(SNR) then grows as $\sqrt{N}$ where $N$ is the trial count, producing
+the familiar event-related potentials --- N170, P300, N400 --- each of
+which typically requires 100 or more trials and 15 to 25 minutes of
+recording per condition.
+
+\subsection{The frequency-tagging alternative}
+
+An alternative, developed over decades in vision science, exploits the
+fact that a sinusoidally or periodically modulated stimulus evokes a
+response at the same frequency. If stimulation is at $f$~Hz, the
+cortical response concentrates at $f$~Hz and its harmonics; noise in
+the EEG is broadband ($\sim 1/f$ plus measurement). A narrow-band SNR
+estimate therefore yields a dramatic signal-to-noise gain without
+trial averaging. \citet{norcia2015jvis} review the full SSVEP literature
+and codify the analysis principles.
+
+The insight that matters here is that \emph{two} frequencies can be
+tagged simultaneously. If standard stimuli appear at a base frequency
+$F$ and oddball stimuli appear at $F/n$, then a cortical response at
+$F/n$ and its harmonics specifically indicates discrimination between
+standard and oddball --- without any behavioural task. This is the
+core of both the Rossion face-individuation paradigm and the Stothart
+Fastball memory assessment.
+
+<<fig-timing-diagram, echo=False, fig=True, width='\linewidth', caption='Schematic timing of a frequency-tagged oddball paradigm. Every 5th standard is replaced by an oddball, yielding responses at the base rate $F$ and at the oddball rate $F/5$. Top bar: stimulus stream. Bottom traces: idealised amplitude spectra as base rate rises from 3 Hz (Stothart Fastball) to 5.88 Hz (Rossion FPVS).'>>=
+fig, (ax1, ax2) = plt.subplots(
+    2, 1, figsize=(8, 4.0),
+    gridspec_kw={"height_ratios": [1, 2]},
+    constrained_layout=True,
+)
+
+# Top: cartoon stimulus timeline.
+ax1.set_xlim(0, 10)
+ax1.set_ylim(-0.2, 1.2)
+ax1.set_yticks([])
+for i in range(10):
+    colour = "tab:red" if (i + 1) % 5 == 0 else "grey"
+    ax1.fill_between([i, i + 0.5], 0, 1, color=colour, alpha=0.8)
+ax1.set_xlabel("Stimulus index")
+ax1.set_title("Standards (grey) with an oddball every 5th item (red)")
+
+# Bottom: idealised spectra for the two paradigms.
+f = np.linspace(0, 10, 2001)
+def spectrum(base, oddball, amp_base=1.0, amp_odd=0.4, sigma=0.04):
+    s = np.zeros_like(f)
+    for k in range(1, 4):
+        s += amp_base * np.exp(-((f - k*base)**2) / (2*sigma**2))
+    for k in range(1, 5):
+        s += amp_odd * np.exp(-((f - k*oddball)**2) / (2*sigma**2))
+    return s + 0.05 * np.random.default_rng(0).standard_normal(f.size)
+
+ax2.plot(f, spectrum(3.0, 0.6), label="Stothart: base 3 Hz, oddball 0.6 Hz", color="tab:blue")
+ax2.plot(f, spectrum(5.88, 1.176) + 0.8, label="Rossion: base 5.88 Hz, oddball 1.18 Hz", color="tab:green")
+ax2.set_xlim(0, 10)
+ax2.set_xlabel("Frequency (Hz)")
+ax2.set_ylabel("|FFT| (a.u.)")
+ax2.legend(loc="upper right")
+ax2.grid(True, alpha=0.3)
+@
+
+\section{Steady-state visual evoked potentials (SSVEP)}
+\label{sec:ssvep}
+
+\subsection{Definition and taxonomy}
+
+The SSVEP is the cortical response to periodic visual stimulation,
+stationary in the frequency domain. \citet{norcia2015jvis} distinguish:
+
+\begin{itemize}[itemsep=2pt,topsep=2pt]
+    \item \textbf{On--off flicker} at a fixed frequency (most common in BCI and
+    attention work).
+    \item \textbf{Continuous sinusoidal contrast modulation}, preferred in
+    Rossion's face-individuation paradigm for its gentler spectral leakage.
+    \item \textbf{Multi-frequency tagging}, in which different stimulus elements
+    flicker at different rates to permit simultaneous tracking of attentional
+    state across competing streams.
+\end{itemize}
+
+\subsection{Why SSVEP beats trial-averaged ERP on SNR}
+
+Let $x(t)$ be EEG recorded during steady-state stimulation with period $T = 1/f$.
+The signal is present at $f$ and its harmonics $\{2f, 3f, \ldots\}$ as a line
+spectrum; the background EEG is approximately $1/f$-distributed with broadband
+noise overlaid. A narrow-band SNR estimate
+
+\begin{equation}
+\mathrm{SNR}(f) = \frac{|X(f)|}{\frac{1}{|B|}\sum_{f'\in B} |X(f')|}
+\end{equation}
+
+\noindent with $B$ a set of neighbouring non-target bins, grows with recording
+duration approximately as $\sqrt{T}$ (because the DFT bin width narrows as
+$1/T$), and the line component grows linearly in amplitude. This is why
+60--180~s of SSVEP data can match or exceed the per-subject SNR of a 20~min
+averaged-ERP study.
+
+\subsection{Typical parameters}
+
+\begin{itemize}[itemsep=2pt,topsep=2pt]
+    \item Base frequencies in the literature span 2--40~Hz;
+    face-specific work uses 5--6~Hz (see
+    Section~\ref{sec:fpvs}).
+    \item Session durations of 60--180~s per condition are
+    standard.
+    \item Electrodes: medial occipital (Oz) for generic SSVEP; lateral
+    occipito-temporal (PO7/PO8/P9/P10) for face-specific responses.
+\end{itemize}
+
+\section{FPVS face individuation (Rossion lab)}
+\label{sec:fpvs}
+
+\subsection{Paradigm}
+
+\citet{liushuang2014} introduced an oddball variant of FPVS for unfamiliar
+face individuation. An image of a single unfamiliar base identity is
+presented at 5.88~Hz (170~ms SOA); every fifth stimulus is swapped
+for a different unfamiliar identity, yielding an oddball rate of
+1.176~Hz. A response at the oddball frequency and its harmonics
+indicates that the visual system discriminates the newly-presented identity
+from the repeated base.
+
+\subsection{Key empirical results}
+
+\begin{itemize}[itemsep=2pt,topsep=2pt]
+    \item A robust oddball response is recorded over \emph{right}
+    occipito-temporal cortex (PO8, P10), convergent with the known
+    right-hemisphere dominance of face identity processing.
+    \item Intracerebral recordings localise the response to inferior
+    occipital and fusiform gyri.
+    \item The paradigm has now been applied in more than twenty published
+    studies covering prosopagnosia, autism spectrum conditions, infant face
+    processing, and cross-cultural face recognition.
+\end{itemize}
+
+\subsection{Stimuli}
+
+The canonical Liu-Shuang stimuli are 50 unfamiliar face identities,
+neutral expression, cropped to exclude external features, presented
+against a grey background at 11\,\textdegree\ $\times$ 9\,\textdegree\ of
+visual angle. These stimuli are not publicly distributed due to
+subject-image rights. Open alternatives with comparable norming
+include the Chicago Face Database and KDEF; custom sets compiled from
+either can reproduce the paradigm faithfully with minor re-norming.
+
+<<fig-rossion-spectrum, echo=False, fig=True, width='0.9\linewidth', caption='Idealised Rossion FPVS oddball response at right occipito-temporal cortex. Red dashed line: base 5.88 Hz. Blue dashed lines: oddball 1.176 Hz and harmonics. The oddball response is the unambiguous neural signature of face individuation.'>>=
+f = np.linspace(0, 10, 2001)
+spec = np.zeros_like(f)
+for k in range(1, 3):
+    spec += 1.0 * np.exp(-((f - k*5.88)**2) / (2*0.04**2))
+for k in range(1, 5):
+    spec += 0.45 * np.exp(-((f - k*1.176)**2) / (2*0.04**2))
+spec += 0.05 * np.random.default_rng(1).standard_normal(f.size)
+
+fig, ax = plt.subplots(figsize=(8, 3.2), constrained_layout=True)
+ax.plot(f, spec, color="black", linewidth=0.9)
+ax.axvline(5.88, color="red", linestyle="--", linewidth=1, label="base 5.88 Hz")
+for k in range(1, 5):
+    ax.axvline(1.176*k, color="blue", linestyle=":", linewidth=0.8, alpha=0.7)
+ax.set_xlabel("Frequency (Hz)")
+ax.set_ylabel("|FFT| (a.u.)")
+ax.set_title("Rossion FPVS face individuation (schematic spectrum, right OT channel)")
+ax.legend(loc="upper right")
+ax.grid(True, alpha=0.3)
+@
+
+\section{Fastball memory assessment (Stothart et al.)}
+\label{sec:fastball}
+
+\subsection{Paradigm}
+
+\citet{stothart2020neuroimage} introduced the Fastball paradigm as a
+recognition-memory variant of frequency-tagged oddball. Every-day colour
+objects drawn from the Bank of Standardised Stimuli v2.0~\citep{brodeur2010boss}
+are shown at a base rate of 3~Hz (166~ms image + 166~ms ISI).
+In the recognition condition, every fifth image is an item that the
+participant has been pre-exposed to moments earlier; the oddball rate is
+0.6~Hz. An above-baseline response at 0.6~Hz and harmonics
+demonstrates that the cortex differentiates seen from unseen items, \emph{with
+no behavioural response required}.
+
+\subsection{Application to dementia}
+
+\begin{itemize}[itemsep=2pt,topsep=2pt]
+    \item \citet{stothart2021brain} applied Fastball to twenty Alzheimer's
+    patients, twenty healthy older adults, and twenty younger adults. The
+    paradigm distinguished AD from healthy older adults with
+    \mbox{AUC $= 0.86$} ($p < 0.001$), whereas a behavioural two-alternative
+    forced-choice task achieved only AUC $= 0.63$ ($p = 0.148$) on the same
+    cohort.
+    \item \citet{stothart2025braincomms} extended the paradigm to 107
+    participants including amnestic and non-amnestic mild cognitive impairment.
+    Fastball responses in aMCI were reduced relative to controls, supporting
+    use as an early biomarker of amnestic dysfunction.
+    \item Home-use trials are ongoing in collaboration with BRACE
+    Alzheimer's Research; results are forthcoming in 2026.
+\end{itemize}
+
+\subsection{Why it works for memory specifically}
+
+The Fastball oddball is a \emph{memory-modulated} stimulus: whether a given
+image counts as ``standard'' or ``oddball'' is determined by the participant's
+history, not by any low-level visual feature. Discriminability in the
+frequency-domain response therefore cannot be inherited from basic sensory
+mismatch --- it requires access to encoding and retrieval circuitry. In
+Alzheimer's disease the retrieval disruption is profound enough that the
+oddball response collapses even when patients still score above chance on
+overt tests, which is precisely what makes the paradigm a useful early
+biomarker.
+
+<<fig-fastball-spectrum, echo=False, fig=True, width='0.9\linewidth', caption="Idealised Stothart Fastball spectrum at Oz/Pz. Red dashed line: base 3 Hz. Blue dashed lines: oddball 0.6 Hz and harmonics. In Alzheimer's disease (dashed trace) the oddball response amplitude is markedly reduced relative to healthy older adults (solid trace), while the base-rate response is preserved.">>=
+f = np.linspace(0, 6, 2001)
+def fastball_spec(strength, seed):
+    s = np.zeros_like(f)
+    for k in range(1, 3):
+        s += 1.0 * np.exp(-((f - k*3.0)**2) / (2*0.04**2))
+    for k in range(1, 6):
+        s += strength * np.exp(-((f - k*0.6)**2) / (2*0.04**2))
+    s += 0.05 * np.random.default_rng(seed).standard_normal(f.size)
+    return s
+
+fig, ax = plt.subplots(figsize=(8, 3.2), constrained_layout=True)
+ax.plot(f, fastball_spec(0.55, 2), color="black", linewidth=1.0, label="Healthy older adult")
+ax.plot(f, fastball_spec(0.12, 3), color="tab:red", linewidth=1.0, linestyle="--", label="Alzheimer's disease")
+ax.axvline(3.0, color="red", linestyle="--", linewidth=1, alpha=0.5)
+for k in range(1, 6):
+    ax.axvline(0.6*k, color="blue", linestyle=":", linewidth=0.7, alpha=0.5)
+ax.set_xlabel("Frequency (Hz)")
+ax.set_ylabel("|FFT| (a.u.)")
+ax.set_title("Fastball recognition-memory oddball (schematic, Oz/Pz)")
+ax.legend(loc="upper right")
+ax.grid(True, alpha=0.3)
+@
+
+\section{Shared methodology: analysis of a frequency-tagged oddball}
+\label{sec:methods}
+
+Across all three paradigms, the analysis pipeline is largely shared.
+
+\subsection{Pre-processing}
+
+\begin{enumerate}[itemsep=2pt,topsep=2pt]
+    \item Notch filter at line frequency (50~Hz or 60~Hz).
+    \item Bandpass 0.1 to 100~Hz (broad enough to retain harmonics).
+    \item Artifact rejection by amplitude threshold or component-based methods
+    (ICA for multi-channel montages; simple threshold for 8-channel dry-electrode
+    devices such as the g.tec Unicorn).
+    \item Crop to integer multiples of the oddball period so the FFT has bins
+    exactly at the target frequencies (avoids spectral leakage).
+\end{enumerate}
+
+\subsection{Spectral analysis}
+
+Compute the FFT of the continuous pre-processed record per channel. Extract
+amplitudes at the target (base and oddball) frequencies and their harmonics.
+
+\subsection{Signal-to-noise estimation}
+
+The Liu-Shuang / Stothart convention is
+
+\begin{equation}
+\mathrm{SNR}(f_t) \;=\; \frac{|X(f_t)|}{\frac{1}{|N|}\sum_{f \in N} |X(f)|}
+\end{equation}
+
+\noindent where $N$ is the set of neighbouring bins within $\pm 0.10$~Hz of
+the target, excluding the immediately-adjacent bins. A z-score of the target
+bin against the noise distribution, $z > 1.96$, corresponds to $p < 0.05$
+uncorrected and is the standard per-harmonic significance threshold.
+
+\subsection{Harmonic summation}
+
+Summing SNR across harmonics $\{f_t, 2f_t, 3f_t, \ldots\}$ increases
+sensitivity when the response contains energy beyond the fundamental ---
+which is the norm in visual oddball paradigms. Stothart sums ten harmonics
+up to 7.2~Hz; Rossion sums four to five harmonics up to
+5~Hz.
+
+\section{Practical implications for low-channel EEG}
+
+The g.tec Unicorn Hybrid Black provides eight fixed dry electrodes
+(Fz, C3, Cz, C4, Pz, PO7, Oz, PO8) at 250~Hz. This is
+materially sparser than the 65--128 channel research montages in the
+primary papers, but it is sufficient for:
+
+\begin{itemize}[itemsep=2pt,topsep=2pt]
+    \item \textbf{SSVEP generic}: Oz and the parieto-occipital ring
+    (PO7/PO8) are the primary SSVEP sites --- the Unicorn covers all
+    three.
+    \item \textbf{Rossion face FPVS}: PO8 proxies the right
+    occipito-temporal peak reported by Liu-Shuang. PO7 provides the
+    left-hemisphere control. Oz captures the base-rate response.
+    Missing: P10 / TP10, which sit ventrally relative to PO8 and
+    capture additional face-response variance but are not essential.
+    \item \textbf{Stothart Fastball}: Oz and Pz cover the mid-occipital/
+    parietal ridge where Stothart reports peak oddball amplitude.
+\end{itemize}
+
+In this project, the new paradigm modules
+(\texttt{eegnb.experiments.fpvs\_stothart.VisualFPVSStothart} and
+\texttt{eegnb.experiments.fpvs\_rossion.VisualFPVSRossion}) expose the
+paradigm-appropriate region of interest as a
+\texttt{channels\_of\_interest} attribute, which downstream analysis
+code resolves to brainflow channel indices via
+\texttt{eegnb.utils.rois.resolve\_roi}. Because the Unicorn's hardware
+montage is fixed, this amounts to a software-side ROI selection rather
+than a physical reconfiguration.
+
+\section{Limitations and open questions}
+
+\begin{itemize}[itemsep=2pt,topsep=2pt]
+    \item \textbf{Display timing.} Frequency-tagged paradigms require
+    precise per-frame timing; lab-grade CRTs or gaming-grade LCDs at
+    refresh rates that are integer multiples of the target frequency
+    are preferred. On Wayland-native compositors (Fedora 43 etc.)
+    XWayland introduces frame jitter of the order of the monitor's
+    vblank interval; whether this is tolerable depends on the target
+    precision.
+    \item \textbf{Dry electrodes.} Stothart's validation was run on a
+    65-channel HydroCel Geodesic net with impedances
+    <50~k$\Omega$. Dry-electrode devices such as the Unicorn
+    start an order of magnitude higher and are more sensitive to
+    motion artifact. Expect to need more trials/longer sessions than
+    the published minimums.
+    \item \textbf{Reference identities.} Rossion's paradigm as
+    published fixes the base identity throughout a sequence. Replacing
+    the base with a pool of identities changes the inference: the
+    oddball response then indexes discrimination between two pools,
+    not between a specific identity and the rest.
+    \item \textbf{Clinical translation.} Stothart's Alzheimer's result
+    is impressive at AUC $= 0.86$ but is based on a relatively small
+    sample; community-wide validation and home-use data are still
+    emerging.
+\end{itemize}
+
+\section{Conclusion}
+
+Three paradigms, one trick: periodic stimulation turns a trial-averaging
+problem into a narrow-band SNR problem. SSVEP demonstrates the
+principle, Rossion FPVS adapts it to category-level discrimination
+with a face-identity oddball, and Stothart's Fastball extends it into
+a clinically viable memory assay. For small-channel dry-electrode EEG
+systems such as the g.tec Unicorn, all three remain tractable with
+minor ROI accommodations. The shared logic means the underlying
+analysis pipeline --- FFT, SNR at target plus harmonics, z-score against
+neighbouring bins --- is portable across paradigms with minimal code
+change.
+
+\bibliographystyle{unsrtnat}
+
+\begin{thebibliography}{99}
+
+\bibitem[Norcia et al.(2015)]{norcia2015jvis}
+Norcia, A.~M., Appelbaum, L.~G., Ales, J.~M., Cottereau, B.~R., and
+Rossion, B. (2015).
+\newblock The steady-state visual evoked potential in vision research:
+A review.
+\newblock \emph{Journal of Vision} 15(6):4.
+\newblock \href{https://doi.org/10.1167/15.6.4}{doi:10.1167/15.6.4}.
+
+\bibitem[Liu-Shuang et al.(2014)]{liushuang2014}
+Liu-Shuang, J., Norcia, A.~M., and Rossion, B. (2014).
+\newblock An objective index of individual face discrimination in the
+right occipito-temporal cortex by means of fast periodic oddball
+stimulation.
+\newblock \emph{Neuropsychologia} 52:57--72.
+\newblock \href{https://doi.org/10.1016/j.neuropsychologia.2013.10.022}
+{doi:10.1016/j.neuropsychologia.2013.10.022}.
+
+\bibitem[Stothart et al.(2020)]{stothart2020neuroimage}
+Stothart, G., Smith, L.~J., Milton, A., and Coulthard, E. (2020).
+\newblock A rapid, neural measure of implicit recognition memory using
+fast periodic visual stimulation.
+\newblock \emph{NeuroImage} (paradigm introduction paper; DOI to
+confirm).
+
+\bibitem[Stothart et al.(2021)]{stothart2021brain}
+Stothart, G., Smith, L.~J., Milton, A., and Coulthard, E. (2021).
+\newblock A passive and objective measure of recognition memory in
+Alzheimer's disease using Fastball memory assessment.
+\newblock \emph{Brain} 144(9):2812--2825.
+\newblock \href{https://doi.org/10.1093/brain/awab154}
+{doi:10.1093/brain/awab154}.
+
+\bibitem[Stothart et al.(2025)]{stothart2025braincomms}
+Stothart, G.\ et al. (2025).
+\newblock A passive and objective measure of recognition memory in
+mild cognitive impairment using Fastball memory assessment.
+\newblock \emph{Brain Communications} 7(5):fcaf279.
+\newblock \href{https://doi.org/10.1093/braincomms/fcaf279}
+{doi:10.1093/braincomms/fcaf279}.
+
+\bibitem[Brodeur et al.(2010)]{brodeur2010boss}
+Brodeur, M.~B., Dionne-Dostie, E., Montreuil, T., and Lepage, M.
+(2010).
+\newblock The Bank of Standardized Stimuli (BOSS), a new set of 480
+normative photos of objects to be used as visual stimuli in cognitive
+research.
+\newblock \emph{PLoS ONE} 5(5):e10773.
+
+\end{thebibliography}
+
+\end{document}
