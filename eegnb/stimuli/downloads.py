@@ -13,9 +13,10 @@ requires registration on chicagofaces.org; our helper assumes the
 user has downloaded the archive themselves and only handles the
 extract / filter / preprocess step afterwards.
 
-Every function here has side effects on the local filesystem; none
-makes network calls other than `fetch_boss`, which pulls from
-Figshare.
+Every function here has side effects on the local filesystem; only
+`fetch_boss` makes network calls, via `gdown` to Google Drive
+(because the BOSS archive is hosted there rather than at a plain
+HTTP endpoint).
 """
 
 from __future__ import annotations
@@ -28,53 +29,72 @@ from pathlib import Path
 
 # --- BOSS ---------------------------------------------------------------
 
-# BOSS Phase II (930 normative photos) on PLOS Figshare:
-BOSS_FIGSHARE_URL = (
-    "https://plos.figshare.com/ndownloader/files/1635581"
-)
-BOSS_PROJECT_PAGE = (
-    "https://plos.figshare.com/articles/dataset/"
-    "_Bank_of_Standardized_Stimuli_BOSS_Phase_II_930_New_Normative_Photos_/"
-    "1168008"
-)
+# Canonical BOSS project page; the Figshare mirror only holds the
+# supplementary PDFs, not the image archive. The authors distribute
+# the actual images via a Google Drive link advertised on the project
+# site.
+BOSS_PROJECT_PAGE = "https://sites.google.com/site/bosstimuli/"
+
+# Google Drive file id of the BOSS archive. Hard-coded as the default;
+# pass `gdrive_id=...` to override if the authors move the file.
+BOSS_GDRIVE_ID = "1FpnEFkbqe_huRwfsCf7gs5R1zuc1ZOkn"
 
 
 def fetch_boss(
-    out_dir: str | os.PathLike | None = None, overwrite: bool = False
+    out_dir: str | os.PathLike | None = None,
+    overwrite: bool = False,
+    gdrive_id: str | None = None,
 ) -> Path:
-    """Download BOSS Phase II from Figshare.
+    """Download the BOSS image archive from Google Drive via gdown.
+
+    Google Drive's "confirm download for large file" handshake is not
+    compatible with a naive urlopen; we delegate to ``gdown`` which
+    already knows the dance. ``gdown`` is a base dependency of the
+    package (used to fetch example datasets elsewhere).
 
     Parameters
     ----------
     out_dir : path | None
         Where to extract the archive. Defaults to
-        `eegnb/stimuli/visual/boss_v2/` in the installed package so
-        paradigm code can find the images via
-        `eegnb.stimuli.BOSS_V2`.
+        `eegnb/stimuli/visual/boss_v2/`.
     overwrite : bool
         If True, re-download even if the output directory is populated.
-
-    Returns
-    -------
-    Path
-        Directory containing the extracted images.
+    gdrive_id : str | None
+        Override the hard-coded Google Drive file id.
     """
+    try:
+        import gdown
+    except ImportError as exc:  # pragma: no cover
+        raise ImportError(
+            "gdown is required to fetch BOSS. "
+            "Install with: uv pip install gdown"
+        ) from exc
+
     if out_dir is None:
         from eegnb.stimuli import FACE_HOUSE
 
-        # Default alongside the bundled face_house stim dir.
         out_dir = Path(FACE_HOUSE).parent / "boss_v2"
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    zip_path = out_dir / "boss_phase2.zip"
-    if not zip_path.exists() or overwrite:
-        _download(BOSS_FIGSHARE_URL, zip_path)
+    zip_path = out_dir / "boss.zip"
+    if not zip_path.exists() or overwrite or zip_path.stat().st_size == 0:
+        gdown.download(
+            id=gdrive_id or BOSS_GDRIVE_ID,
+            output=str(zip_path),
+            quiet=False,
+        )
+
+    if not zipfile.is_zipfile(zip_path):
+        raise RuntimeError(
+            f"downloaded file at {zip_path} is not a zip; "
+            "the Google Drive id may have changed. See "
+            f"{BOSS_PROJECT_PAGE} for the current location."
+        )
 
     with zipfile.ZipFile(zip_path) as zf:
         zf.extractall(out_dir)
 
-    # Leave the zip in place; the user can delete it after confirming.
     return out_dir
 
 
