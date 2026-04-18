@@ -8,6 +8,7 @@ from eegnb.experiments import VisualN170, Experiment
 from eegnb.experiments import VisualP300
 from eegnb.experiments import VisualSSVEP
 from eegnb.experiments import AuditoryOddball
+from eegnb.experiments import VisualFPVSStothart, VisualFPVSRossion
 from eegnb.experiments.visual_cueing import cueing
 from eegnb.experiments.visual_codeprose import codeprose
 from eegnb.experiments.auditory_oddball import diaconescu
@@ -26,6 +27,8 @@ experiments = {
     "auditory-SSAEP onefreq": ssaep_onefreq,
     "auditory-oddball orig": AuditoryOddball(),
     "auditory-oddball diaconescu": diaconescu,
+    "visual-fpvs-stothart": VisualFPVSStothart(),
+    "visual-fpvs-rossion": VisualFPVSRossion(),
 }
 
 
