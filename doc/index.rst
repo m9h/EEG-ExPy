@@ -27,13 +27,19 @@
 
 
 .. toctree::
+   :caption: Project
+   :maxdepth: 2
+
+   roadmap/scope_and_roadmap
+
+.. toctree::
    :caption: Misc
    :maxdepth: 4
 
    misc/using_an_extra_electrod_with_the_muse
    misc/muse_info
    misc/about_the_docs
-   misc/ntcs_phase1_instructions  
+   misc/ntcs_phase1_instructions
 
    
    
