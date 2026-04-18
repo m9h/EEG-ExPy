@@ -278,5 +278,98 @@ def impcheck(eegdevice: str, duration: float, line: float,
             print(f"  {c.name}: {note}")
 
 
+@main.command()
+@click.option("-b", "--baseline", "baseline_csv", required=True,
+              type=click.Path(exists=True),
+              help="CSV of a resting-state (eyes-open) baseline recording.")
+@click.option("-ex", "--experiment", required=True,
+              help="Paradigm to tune "
+                   "(visual-fpvs-stothart | visual-fpvs-rossion).")
+@click.option("--margin", type=float, default=0.5,
+              help="Safety margin in Hz around each subject peak.")
+@click.option("--harmonics", type=int, default=5,
+              help="Number of oddball harmonics to check.")
+def tune(baseline_csv: str, experiment: str, margin: float,
+         harmonics: int):
+    """Check paradigm tag frequencies against subject baseline peaks.
+
+    Fits FOOOF / specparam to the baseline recording, then flags any
+    paradigm base or oddball harmonic that lands within a subject peak
+    (± bandwidth/2 ± safety margin). Reports whether the design is
+    clear and suggests a nearby base rate if it isn't.
+    """
+    from eegnb.analysis.baseline import fit_resting_peaks
+    from eegnb.analysis.power import check_paradigm_collisions
+
+    paradigm_params = {
+        "visual-fpvs-stothart": dict(base_hz=3.0, oddball_hz=0.6),
+        "visual-fpvs-rossion":  dict(base_hz=5.88, oddball_hz=1.176),
+    }
+    if experiment not in paradigm_params:
+        print(f"unknown paradigm {experiment!r}; expected one of "
+              f"{sorted(paradigm_params)}")
+        return
+    pp = paradigm_params[experiment]
+
+    print(f"Fitting FOOOF to {baseline_csv}...")
+    profile = fit_resting_peaks(baseline_csv)
+    print(f"  {len(profile.channels)} channels, "
+          f"{profile.duration_s:.1f}s duration, {profile.sfreq_hz} Hz")
+    for peak in profile.alpha_peaks[:4]:
+        print(f"  alpha: {peak.channel} @ {peak.centre_hz:.2f} Hz "
+              f"(bw {peak.bandwidth_hz:.2f})")
+    for peak in profile.beta_peaks[:4]:
+        print(f"  beta:  {peak.channel} @ {peak.centre_hz:.2f} Hz "
+              f"(bw {peak.bandwidth_hz:.2f})")
+    print()
+
+    print(f"Checking {experiment} (base {pp['base_hz']} Hz, "
+          f"oddball {pp['oddball_hz']} Hz, {harmonics} harmonics):")
+    cols = check_paradigm_collisions(
+        base_hz=pp["base_hz"],
+        oddball_hz=pp["oddball_hz"],
+        peaks=profile,
+        n_oddball_harmonics=harmonics,
+        safety_margin_hz=margin,
+    )
+    if not cols:
+        print("  [OK] no collisions between tags and subject peaks.")
+        return
+
+    print(f"  [WARN] {len(cols)} collision(s):")
+    for c in cols:
+        print(f"    {c.tag_label} @ {c.tag_hz:.2f} Hz vs "
+              f"{c.peak_channel} peak @ {c.peak_hz:.2f} Hz "
+              f"(gap {c.gap_hz:.2f} Hz)")
+
+    import numpy as np
+
+    base_hz = pp["base_hz"]
+    candidates = np.linspace(base_hz * 0.8, base_hz * 1.2, 41)
+    clean: list[tuple[float, float]] = []
+    for cand_base in candidates:
+        cand_odd = cand_base * pp["oddball_hz"] / base_hz
+        if check_paradigm_collisions(
+            base_hz=cand_base, oddball_hz=cand_odd,
+            peaks=profile, n_oddball_harmonics=harmonics,
+            safety_margin_hz=margin,
+        ):
+            continue
+        clean.append((cand_base, cand_odd))
+    if clean:
+        cand_base, cand_odd = min(
+            clean, key=lambda x: abs(x[0] - base_hz)
+        )
+        print(
+            f"  Suggestion: shift base to {cand_base:.2f} Hz "
+            f"(oddball {cand_odd:.3f} Hz) to clear collisions."
+        )
+    else:
+        print(
+            "  No clean base rate found within ±20%; reduce harmonics "
+            "or accept that a harmonic collides with endogenous rhythms."
+        )
+
+
 if __name__ == "__main__":
     main()
