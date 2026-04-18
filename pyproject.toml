@@ -43,7 +43,6 @@ dependencies = [
     "click>=8.1",
     "airium>=0.2",
     "jupyter",
-    "pweave>=0.30",
     "jinja2>=3.1",
 ]
 
