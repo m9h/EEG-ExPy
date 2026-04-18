@@ -29,6 +29,14 @@ def main():
 @click.option(
     "-ip", "--prompt", help="Use interactive prompt to ask for parameters", is_flag=True
 )
+@click.option(
+    "--report/--no-report", "report", default=True,
+    help="Generate a Pweave LaTeX report after the run (default: on).",
+)
+@click.option(
+    "--report-no-pdf", is_flag=True,
+    help="Emit only the .tex; skip pdflatex (useful on machines without TeX).",
+)
 def runexp(
     experiment: str,
     eegdevice: Optional[str] = None,
@@ -36,8 +44,9 @@ def runexp(
     recdur: Optional[float] = None,
     outfname: Optional[str] = None,
     prompt: bool = False,
+    report: bool = True,
+    report_no_pdf: bool = False,
     dosigqualcheck = True,
-    generatereport = True
 ):
     """
     Run experiment.
@@ -78,22 +87,28 @@ def runexp(
             "Sorry, didn't recognize answer. "
             askforsigqualcheck()
     
-    def askforreportcheck():
-        generatereport = input("\n\nGenerate Report? (Y/n): \n").lower() != "n"
-
     if dosigqualcheck:
         askforsigqualcheck()
-    
-    if generatereport:
-        askforreportcheck()
 
     run_experiment(experiment, eeg, recdur, outfname)
 
     print(f"\n\n\nExperiment complete! Recorded data is saved @ {outfname}")
 
-    #if generatereport:
-    #    # Error of filenames being multiple etc, needs to be handled
-    #    create_analysis_report(experiment=experiment, device_name=eegdevice, fnames=outfname)
+    if report:
+        try:
+            from eegnb.reports import generate_report
+
+            device_for_report = eegdevice or "unicorn"
+            out = generate_report(
+                csv_path=outfname,
+                paradigm=experiment,
+                device=device_for_report,
+                run_pdflatex=not report_no_pdf,
+            )
+            print(f"Report generated: {out}")
+        except Exception as exc:
+            # Don't let a report failure mask a successful recording.
+            print(f"[report] skipped: {exc}")
 
 
 @main.command()
