@@ -25,6 +25,7 @@ from pandas import DataFrame
 import numpy as np
 
 from eegnb.experiments import Experiment
+from eegnb.paradigms.fsl_timing import FSLTimingSchedule, load_fsl_three_column
 from eegnb.stimuli import FACE_HOUSE
 
 
@@ -59,6 +60,10 @@ class VisualFPVSStothart(Experiment.BaseExperiment):
 
     name = "Visual FPVS Stothart"
     __title__ = "Fastball — object-recognition FPVS (Stothart 2021)"
+
+    # Use frame-count-locked presentation by default — the whole SNR
+    # argument of the paradigm depends on strictly periodic onsets.
+    default_frame_locked = True
 
     # Analysis region of interest for the Unicorn Hybrid Black montage.
     # The Unicorn has fixed hardware electrodes; this attribute only
@@ -113,6 +118,67 @@ class VisualFPVSStothart(Experiment.BaseExperiment):
         self.trials = DataFrame(
             dict(parameter=self.parameter, timestamp=np.zeros(n_trials))
         )
+
+        # If a schedule is attached via from_fsl_timing_file, it
+        # overrides the deterministic pattern below in load_stimulus.
+        self._fsl_schedule: FSLTimingSchedule | None = None
+
+    @classmethod
+    def from_fsl_timing_file(
+        cls,
+        path: str,
+        *,
+        duration: float | None = None,
+        eeg=None,
+        save_fn=None,
+        standard_dir: str | None = None,
+        deviant_dir: str | None = None,
+        base_rate_hz: float = 3.0,
+        standards_per_deviant: int = 5,
+    ) -> "VisualFPVSStothart":
+        """Build a Stothart paradigm whose trial sequence is driven
+        by a published FSL 3-column timing file.
+
+        Each non-comment row of the timing file is treated as one
+        stimulus with onset, duration and a value column where 1
+        designates a standard and 2 designates an oddball. The
+        paradigm's internal `parameter`, `iti`, `soa` and `duration`
+        are overwritten to match the schedule.
+        """
+        schedule = load_fsl_three_column(path)
+        if not schedule.events:
+            raise ValueError(f"{path}: schedule contains no events")
+        schedule_duration = schedule.total_duration_s
+
+        inst = cls(
+            duration=duration if duration is not None else schedule_duration,
+            eeg=eeg,
+            save_fn=save_fn,
+            standard_dir=standard_dir,
+            deviant_dir=deviant_dir,
+            base_rate_hz=base_rate_hz,
+            standards_per_deviant=standards_per_deviant,
+            n_trials=len(schedule),
+        )
+        inst._fsl_schedule = schedule
+        inst.parameter = np.array(
+            [int(e.value) for e in schedule.events], dtype=int
+        )
+        inst.trials = DataFrame(
+            dict(parameter=inst.parameter, timestamp=np.zeros(len(schedule)))
+        )
+        # SOA / ITI become the schedule's own durations / gaps.
+        # We take the first event's duration as the nominal "on" time
+        # and the gap to the next event as the "off" time; BaseExperiment's
+        # trial loop respects these per-trial (the loop uses the class
+        # attribute, not per-event timing — so this is an approximation
+        # until frame-locked presentation is in place).
+        first = schedule.events[0]
+        inst.soa = first.duration_s
+        if len(schedule) > 1:
+            second = schedule.events[1]
+            inst.iti = max(0.0, second.onset_s - (first.onset_s + first.duration_s))
+        return inst
 
     def load_stimulus(self):
         if not os.path.isdir(self.standard_dir):

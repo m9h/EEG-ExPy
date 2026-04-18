@@ -248,6 +248,71 @@ def design_efficiency(
     )
 
 
+@dataclass
+class FrequencyCollision:
+    """One paradigm tag frequency that overlaps a subject peak."""
+
+    tag_label: str
+    tag_hz: float
+    peak_channel: str
+    peak_hz: float
+    peak_bandwidth_hz: float
+    gap_hz: float  # |tag - peak|; <= (bw/2 + margin) to be a collision
+
+
+def check_paradigm_collisions(
+    base_hz: float,
+    oddball_hz: float,
+    peaks,
+    n_base_harmonics: int = 2,
+    n_oddball_harmonics: int = 5,
+    safety_margin_hz: float = 0.5,
+    ignore_base_rate: bool = True,
+):
+    """Flag paradigm tag frequencies that overlap subject peaks.
+
+    `peaks` is either a `PeakProfile` or a list of `SpectralPeak`.
+    Returns a list of `FrequencyCollision` rows, one per
+    (tag, peak) pair that falls within ``peak.bandwidth_hz/2 +
+    safety_margin_hz``. Empty list means the design is clear.
+
+    `ignore_base_rate` suppresses collisions on the base rate and its
+    harmonics, since Rossion's canonical paradigm accepts base-rate
+    overlap as expected noise and analyses only the oddball peaks.
+    """
+    from eegnb.analysis.baseline import PeakProfile, SpectralPeak
+
+    if hasattr(peaks, "peaks"):
+        peak_list: list[SpectralPeak] = list(peaks.peaks)
+    else:
+        peak_list = list(peaks)
+
+    tags: list[tuple[str, float]] = []
+    if not ignore_base_rate:
+        for k in range(1, n_base_harmonics + 1):
+            tags.append((f"base_h{k}", base_hz * k))
+    for k in range(1, n_oddball_harmonics + 1):
+        tags.append((f"odd_h{k}", oddball_hz * k))
+
+    collisions: list[FrequencyCollision] = []
+    for label, tag_hz in tags:
+        for peak in peak_list:
+            tolerance = peak.bandwidth_hz / 2.0 + safety_margin_hz
+            gap = abs(tag_hz - peak.centre_hz)
+            if gap <= tolerance:
+                collisions.append(
+                    FrequencyCollision(
+                        tag_label=label,
+                        tag_hz=tag_hz,
+                        peak_channel=peak.channel,
+                        peak_hz=peak.centre_hz,
+                        peak_bandwidth_hz=peak.bandwidth_hz,
+                        gap_hz=gap,
+                    )
+                )
+    return collisions
+
+
 def format_detection_power(result: DetectionPower) -> str:
     """Human-readable one-paragraph summary of a detection-power result."""
     lines = [

@@ -310,11 +310,76 @@ class BaseExperiment(ABC):
 
         return True
 
-    def run(self, instructions=True):
-        """ Run the experiment """
+    def _run_frame_locked_trial_loop(self, frames_on: int, frames_off: int):
+        """Frame-count-locked variant of the trial loop.
+
+        Draws each stimulus for exactly `frames_on` consecutive window
+        flips, then blanks for `frames_off` flips, then advances. This
+        removes the ± one-vblank jitter of the time-based polling loop
+        and is required for publishable FPVS / SSVEP recordings where
+        the tag frequency has to land in exactly one FFT bin.
+
+        Each flip's timestamp is captured into `self.flip_times` (as a
+        list of 2-tuples `(trial_idx_or_-1, flip_t_seconds)`). For FPVS
+        analysis, the subset with `trial_idx != -1` marks stimulus
+        onsets and the inter-flip differences give the measured
+        presentation duration per cycle.
+        """
+        from psychopy import core
+
+        clock = core.MonotonicClock()
+        self.flip_times: list[tuple[int, float]] = []
+        self._clear_user_input()
+
+        for trial_idx in range(self.n_trials):
+            # Stimulus-on frames: draw + flip exactly `frames_on` times.
+            for frame in range(frames_on):
+                if frame == 0:
+                    # present_stimulus itself calls win.flip() internally
+                    self.present_stimulus(trial_idx)
+                    self.flip_times.append((trial_idx, clock.getTime()))
+                else:
+                    self.window.flip()
+                    self.flip_times.append((trial_idx, clock.getTime()))
+                if self._user_input("cancel"):
+                    return False
+
+            # Blank / ITI frames.
+            for _ in range(frames_off):
+                self.present_iti()
+                self.flip_times.append((-1, clock.getTime()))
+                if self._user_input("cancel"):
+                    return False
+
+        return True
+
+    def run(self, instructions=True, frame_locked: bool | None = None,
+            refresh_hz: float | None = None):
+        """Run the experiment.
+
+        Parameters
+        ----------
+        instructions : bool
+            If True, show the welcome/instructions screen and wait for a
+            keypress to start. If False, start immediately — required
+            when running from SSH with no keyboard attached.
+        frame_locked : bool | None
+            If True, use the frame-count-locked presentation loop (N
+            flips on, N flips off per stimulus) and log every flip's
+            timestamp for post-hoc jitter analysis. Required for
+            publishable FPVS / SSVEP recordings. If None, falls back
+            to the class attribute `default_frame_locked`
+            (False for legacy paradigms, True for FPVS).
+        refresh_hz : float | None
+            Monitor refresh rate used to convert SOA/ITI seconds to
+            frame counts. If None, PsychoPy will query the window.
+        """
 
         # Setup the experiment
         self.setup(instructions)
+
+        if frame_locked is None:
+            frame_locked = getattr(self, "default_frame_locked", False)
 
         # Start EEG Stream, wait for signal to settle, and then pull timestamp for start point
         if self.eeg:
@@ -327,7 +392,33 @@ class BaseExperiment(ABC):
         record_start_time = time()
 
         # Run the trial loop
-        self._run_trial_loop(record_start_time, self.duration)
+        if frame_locked:
+            refresh = refresh_hz or self.window.getActualFrameRate() or 60.0
+            frames_on = max(1, int(round(refresh * self.soa)))
+            frames_off = max(1, int(round(refresh * self.iti)))
+            print(
+                f"Frame-locked presentation: refresh ~{refresh:.1f} Hz, "
+                f"{frames_on} frames on + {frames_off} frames off per trial."
+            )
+            self._run_frame_locked_trial_loop(frames_on, frames_off)
+        else:
+            self._run_trial_loop(record_start_time, self.duration)
+
+        # Sidecar: per-flip timestamps for post-hoc timing analysis.
+        if self.save_fn and hasattr(self, "flip_times") and self.flip_times:
+            import json
+            from pathlib import Path
+
+            sidecar = Path(self.save_fn).with_suffix(".flip_times.json")
+            try:
+                sidecar.write_text(json.dumps(
+                    {"flip_times": self.flip_times,
+                     "refresh_hz": refresh_hz},
+                    indent=2,
+                ))
+                print(f"Flip-time sidecar written to {sidecar}")
+            except OSError as exc:
+                print(f"[flip-times] sidecar not written: {exc}")
 
         # Clearing the screen for the next trial
         event.clearEvents()

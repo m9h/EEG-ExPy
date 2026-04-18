@@ -243,15 +243,26 @@ ax.grid(True, alpha=0.3)
 
 \subsection{Paradigm}
 
-\citet{stothart2020neuroimage} introduced the Fastball paradigm as a
-recognition-memory variant of frequency-tagged oddball. Every-day colour
-objects drawn from the Bank of Standardised Stimuli v2.0~\citep{brodeur2010boss}
-are shown at a base rate of 3~Hz (166~ms image + 166~ms ISI).
-In the recognition condition, every fifth image is an item that the
-participant has been pre-exposed to moments earlier; the oddball rate is
-0.6~Hz. An above-baseline response at 0.6~Hz and harmonics
-demonstrates that the cortex differentiates seen from unseen items, \emph{with
-no behavioural response required}.
+The Fastball line of work has a clear pre-history:
+\citet{stothart2017neuropsych} first established that SSVEP
+frequency-tagging can index \emph{semantic} category discrimination
+implicitly (for example, living vs.\ non-living, familiar vs.\
+unfamiliar). \citet{milton2020scirep} then showed that the paradigm
+indexes preserved semantic memory in healthy ageing, confirming that
+the readout is genuinely memory-sensitive rather than purely sensory.
+
+\citet{stothart2020neuroimage} formalised this as the
+\emph{Fastball} paradigm: a recognition-memory variant of frequency-tagged
+oddball. Every-day colour objects drawn from the Bank of Standardised
+Stimuli v2.0~\citep{brodeur2010boss} are shown at a base rate of 3~Hz
+(166~ms image + 166~ms ISI). In the recognition condition, every fifth
+image is an item that the participant has been pre-exposed to moments
+earlier; the oddball rate is 0.6~Hz. An above-baseline response at
+0.6~Hz and harmonics demonstrates that the cortex differentiates seen
+from unseen items, \emph{with no behavioural response required}.
+\citet{nurdal2021ijp} dissect the role of repetition priming in the
+same paradigm, establishing that the Fastball response is not reducible
+to low-level image-repetition effects.
 
 \subsection{Application to dementia}
 
@@ -268,7 +279,24 @@ no behavioural response required}.
     use as an early biomarker of amnestic dysfunction.
     \item Home-use trials are ongoing in collaboration with BRACE
     Alzheimer's Research; results are forthcoming in 2026.
+    \item \citet{hermann2025adlbd} extended the assessment beyond
+    amnestic impairment to Lewy Body Dementia, applying the frequency-
+    tagging readout to \emph{visual} processing deficits characteristic
+    of LBD rather than memory deficits characteristic of AD.
 \end{itemize}
+
+\subsection{Beyond memory: paradigm extensions}
+
+Recent work has shown that the Fastball machinery is not limited to
+recognition memory. \citet{hermann2025neuropsych} used the same
+frequency-tagged oddball design to quantify implicit discrimination of
+\emph{line orientation}, a low-level visual feature with no explicit
+memory component. The same SNR / harmonic-summation analysis applies
+unchanged; only the stimuli differ. This generalisation matters for
+the project at hand: a single paradigm skeleton can serve multiple
+clinical and basic-science questions by swapping the standard/oddball
+stimulus category, without re-engineering the timing, acquisition or
+analysis.
 
 \subsection{Why it works for memory specifically}
 
@@ -440,12 +468,36 @@ stimulation.
 \newblock \href{https://doi.org/10.1016/j.neuropsychologia.2013.10.022}
 {doi:10.1016/j.neuropsychologia.2013.10.022}.
 
+\bibitem[Stothart et al.(2017)]{stothart2017neuropsych}
+Stothart, G., Quadflieg, S., and Milton, A. (2017).
+\newblock A fast and implicit measure of semantic categorisation using
+steady state visual evoked potentials.
+\newblock \emph{Neuropsychologia} 102:11--18.
+\newblock Paradigm precursor: establishes the SSVEP category-level
+discrimination readout later rebranded as Fastball.
+
+\bibitem[Milton et al.(2020)]{milton2020scirep}
+Milton, A., Donnelly, C.~J., Quadflieg, S., and Stothart, G. (2020).
+\newblock Fast periodic visual stimulation indexes preserved semantic
+memory in healthy ageing.
+\newblock \emph{Scientific Reports} 10:14674.
+\newblock \href{https://doi.org/10.1038/s41598-020-69929-5}
+{doi:10.1038/s41598-020-69929-5}.
+
 \bibitem[Stothart et al.(2020)]{stothart2020neuroimage}
-Stothart, G., Smith, L.~J., Milton, A., and Coulthard, E. (2020).
+Stothart, G., Smith, L.~J., and Milton, A. (2020).
 \newblock A rapid, neural measure of implicit recognition memory using
 fast periodic visual stimulation.
-\newblock \emph{NeuroImage} (paradigm introduction paper; DOI to
-confirm).
+\newblock \emph{NeuroImage} 211:116628.
+\newblock \href{https://doi.org/10.1016/j.neuroimage.2020.116628}
+{doi:10.1016/j.neuroimage.2020.116628}.
+\newblock First paper branded ``Fastball''.
+
+\bibitem[Nurdal et al.(2021)]{nurdal2021ijp}
+Nurdal, V., Fairchild, G., and Stothart, G. (2021).
+\newblock The effect of repetition priming on implicit recognition memory
+as measured by Fast Periodic Visual Stimulation and EEG.
+\newblock \emph{International Journal of Psychophysiology} 169:26--34.
 
 \bibitem[Stothart et al.(2021)]{stothart2021brain}
 Stothart, G., Smith, L.~J., Milton, A., and Coulthard, E. (2021).
@@ -456,12 +508,28 @@ Alzheimer's disease using Fastball memory assessment.
 {doi:10.1093/brain/awab154}.
 
 \bibitem[Stothart et al.(2025)]{stothart2025braincomms}
-Stothart, G.\ et al. (2025).
+Stothart, G., Alderman, S., Hermann, O., Creavin, S., and Coulthard, E.
+(2025).
 \newblock A passive and objective measure of recognition memory in
 mild cognitive impairment using Fastball memory assessment.
 \newblock \emph{Brain Communications} 7(5):fcaf279.
 \newblock \href{https://doi.org/10.1093/braincomms/fcaf279}
 {doi:10.1093/braincomms/fcaf279}.
+
+\bibitem[Hermann et al.(2025a)]{hermann2025neuropsych}
+Hermann, O., Leonardi, C., Petrini, K., Coulthard, E., and Stothart, G.
+(2025).
+\newblock Measuring implicit line orientation discrimination using
+fast periodic visual stimulation.
+\newblock \emph{Neuropsychologia} 211:109122.
+\newblock Extends the FPVS paradigm beyond category discrimination into
+low-level visual-feature discrimination.
+
+\bibitem[Hermann et al.(2025b)]{hermann2025adlbd}
+Hermann, O., Petrini, K., Coulthard, E., and Stothart, G. (2025).
+\newblock Assessment of visual processing in Alzheimer's disease and
+Lewy Body Dementia using Fast Periodic Visual Stimulation.
+\newblock \emph{Alzheimer's \& Dementia} 21:e108591.
 
 \bibitem[Brodeur et al.(2010)]{brodeur2010boss}
 Brodeur, M.~B., Dionne-Dostie, E., Montreuil, T., and Lepage, M.

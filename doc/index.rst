@@ -12,6 +12,7 @@
    getting_started/analysis
    getting_started/available_experiments
    getting_started/stimulus_sets
+   getting_started/unicorn_fedora_linux
 
 .. toctree::
    :caption: Experiments

@@ -252,5 +252,31 @@ def localdata_report():
         print(" {}".format(items))
 
 
+@main.command()
+@click.option("-ed", "--eegdevice", default="unicorn",
+              help="EEG device (only unicorn is supported at present).")
+@click.option("-d", "--duration", type=float, default=10.0,
+              help="Seconds to record for the precheck.")
+@click.option("--line", type=float, default=50.0,
+              help="Line frequency in Hz (50 EU, 60 US).")
+@click.option("-sp", "--serial-port", default="/dev/ttyACM0",
+              help="Serial port for the BLED112 dongle.")
+def impcheck(eegdevice: str, duration: float, line: float,
+             serial_port: str):
+    """Dry-electrode signal-quality precheck before a recording session."""
+    from eegnb.analysis.signal_quality import run_signal_quality_check
+
+    report = run_signal_quality_check(
+        device=eegdevice,
+        duration_s=duration,
+        line_freq_hz=line,
+        serial_port=serial_port,
+    )
+    print(report.summary())
+    for c in report.channels:
+        for note in c.notes:
+            print(f"  {c.name}: {note}")
+
+
 if __name__ == "__main__":
     main()

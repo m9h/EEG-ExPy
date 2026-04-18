@@ -62,6 +62,10 @@ class VisualFPVSRossion(Experiment.BaseExperiment):
     name = "Visual FPVS Rossion"
     __title__ = "FPVS face individuation (Rossion 2014)"
 
+    # Use frame-count-locked presentation by default — the whole SNR
+    # argument of the paradigm depends on strictly periodic onsets.
+    default_frame_locked = True
+
     # Analysis region of interest. The face individuation response is
     # strongest at right occipito-temporal electrodes. The Unicorn's
     # fixed montage gives us PO8 (right OT), with Oz and PO7 as the
