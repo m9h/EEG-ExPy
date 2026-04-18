@@ -1,9 +1,6 @@
+from eegnb.utils.audio import configure_audio_backend
 
-#change the pref libraty to PTB and set the latency mode to high precision
-from psychopy import prefs
-prefs.hardware['audioLib'] = 'PTB'
-prefs.hardware['audioLatencyMode'] = 3
-
+configure_audio_backend()
 
 from eegnb.devices.eeg import EEG
 
