@@ -81,15 +81,22 @@ class EEG:
         ip_addr=None,
         ch_names=None,
         config=None,
-        make_logfile=False):
+        make_logfile=False,
+        publish_to_lsl=False):
         """The initialization function takes the name of the EEG device and determines whether or not
         the device belongs to the Muse or Brainflow families and initializes the appropriate backend.
 
         Parameters:
             device (str): name of eeg device used for reading data.
-        
-            ch_names (array_like or None): array containing custom specified channel names. Useful for custom montagues 
+
+            ch_names (array_like or None): array containing custom specified channel names. Useful for custom montagues
         like when external electrodes are used.
+            publish_to_lsl (bool): if True, mirror the brainflow session
+        onto a pair of LSL outlets (``BrainFlow-EEG-<device>`` and
+        ``BrainFlow-Markers-<device>``) so LabRecorder or any LSL-
+        consuming tool can record alongside the native brainflow CSV.
+        Only honoured for brainflow-backed devices; the Muse backend is
+        already LSL-native.
         """
         # determine if board uses brainflow or muselsl backend
         self.device_name = device
@@ -101,6 +108,11 @@ class EEG:
         self.other = other
         self.config = config
         self.make_logfile = make_logfile # currently only used for kf
+        self.publish_to_lsl = publish_to_lsl
+        self._lsl_eeg_outlet = None
+        self._lsl_marker_outlet = None
+        self._lsl_pump_thread = None
+        self._lsl_pump_stop = None
         self.backend = self._get_backend(self.device_name)
         self.initialize_backend()
         self.n_channels = len(EEG_INDICES[self.device_name])
@@ -349,6 +361,9 @@ class EEG:
 
         self.stream_started = True
 
+        if self.publish_to_lsl:
+            self._start_lsl_publisher()
+
         # wait for signal to settle
         if (self.device_name.find("cyton") != -1) or (
             self.device_name.find("ganglion") != -1
@@ -358,8 +373,87 @@ class EEG:
         else:
             sleep(5)
 
+    def _start_lsl_publisher(self):
+        """Bridge the brainflow session onto LSL outlets.
+
+        Creates two LSL outlets — one for EEG samples at the device's
+        native sample rate and one for discrete markers — and starts a
+        daemon thread that drains the brainflow ring buffer and pushes
+        samples onto the EEG outlet. Markers are pushed inline from
+        `_brainflow_push_sample` rather than from the pump thread so
+        their timestamps are tight.
+        """
+        import threading
+
+        eeg_channels = BoardShim.get_eeg_channels(self.brainflow_id)
+        ch_names = BoardShim.get_eeg_names(self.brainflow_id)
+        sfreq = BoardShim.get_sampling_rate(self.brainflow_id)
+
+        eeg_info = StreamInfo(
+            name=f"BrainFlow-EEG-{self.device_name}",
+            type="EEG",
+            channel_count=len(eeg_channels),
+            nominal_srate=sfreq,
+            channel_format="float32",
+            source_id=f"brainflow-{self.device_name}-eeg",
+        )
+        chs = eeg_info.desc().append_child("channels")
+        for name in ch_names:
+            ch = chs.append_child("channel")
+            ch.append_child_value("label", str(name))
+            ch.append_child_value("unit", "microvolts")
+            ch.append_child_value("type", "EEG")
+        self._lsl_eeg_outlet = StreamOutlet(eeg_info)
+
+        marker_info = StreamInfo(
+            name=f"BrainFlow-Markers-{self.device_name}",
+            type="Markers",
+            channel_count=1,
+            nominal_srate=0,
+            channel_format="int32",
+            source_id=f"brainflow-{self.device_name}-markers",
+        )
+        self._lsl_marker_outlet = StreamOutlet(marker_info)
+
+        self._lsl_pump_stop = threading.Event()
+        self._lsl_pump_thread = threading.Thread(
+            target=self._lsl_pump,
+            args=(eeg_channels, float(sfreq)),
+            daemon=True,
+        )
+        self._lsl_pump_thread.start()
+
+    def _lsl_pump(self, eeg_channel_indices, sfreq):
+        """Background loop: drain recent brainflow samples to LSL."""
+        poll_period = max(0.02, 0.5 / sfreq * 20)
+        while not self._lsl_pump_stop.is_set():
+            try:
+                data = self.board.get_current_board_data(256)
+            except Exception:
+                break
+            if data is None or data.shape[1] == 0:
+                sleep(poll_period)
+                continue
+            eeg = data[eeg_channel_indices, :].T  # (n_samples, n_channels)
+            for sample in eeg:
+                self._lsl_eeg_outlet.push_sample(sample.astype(float).tolist())
+            sleep(poll_period)
+
+    def _stop_lsl_publisher(self):
+        if self._lsl_pump_stop is not None:
+            self._lsl_pump_stop.set()
+        if self._lsl_pump_thread is not None:
+            self._lsl_pump_thread.join(timeout=2)
+        self._lsl_eeg_outlet = None
+        self._lsl_marker_outlet = None
+        self._lsl_pump_thread = None
+        self._lsl_pump_stop = None
+
     def _stop_brainflow(self):
         """This functions kills the brainflow backend and saves the data to a CSV file."""
+
+        if self.publish_to_lsl:
+            self._stop_lsl_publisher()
 
         # Collect session data and kill session
         data = self.board.get_board_data()  # will clear board buffer
@@ -420,6 +514,14 @@ class EEG:
     def _brainflow_push_sample(self, marker):
         last_timestamp = self.board.get_current_board_data(1)[self.timestamp_channel][0]
         self.markers.append([marker, last_timestamp])
+        if self._lsl_marker_outlet is not None:
+            try:
+                self._lsl_marker_outlet.push_sample([int(marker)])
+            except (ValueError, TypeError):
+                # If the paradigm pushed a list (muse convention),
+                # coerce its first element.
+                m = marker[0] if isinstance(marker, (list, tuple)) else marker
+                self._lsl_marker_outlet.push_sample([int(m)])
 
     def _brainflow_get_recent(self, n_samples=256):
 
