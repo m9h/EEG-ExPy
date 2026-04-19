@@ -50,6 +50,8 @@ dependencies = [
 analysis = [
     "pyriemann>=0.6",
     "fooof>=1.1",
+    "mne-bids>=0.18",
+    "pybv>=0.7.3",
 ]
 streaming = [
     "brainflow>=5.10",

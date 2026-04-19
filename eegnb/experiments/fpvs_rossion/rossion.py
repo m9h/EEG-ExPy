@@ -62,6 +62,14 @@ class VisualFPVSRossion(Experiment.BaseExperiment):
     name = "Visual FPVS Rossion"
     __title__ = "FPVS face individuation (Rossion 2014)"
 
+    # BIDS-EEG metadata lives in eegnb.bids.paradigms so non-PsychoPy
+    # callers (CLI, exporters) can read it without loading PsychoPy.
+    from eegnb.bids.paradigms import ROSSION as _bids
+    bids_task_name = _bids.bids_task_name
+    bids_event_id = _bids.bids_event_id
+    bids_task_json = _bids.bids_task_json
+    del _bids
+
     # Use frame-count-locked presentation by default — the whole SNR
     # argument of the paradigm depends on strictly periodic onsets.
     default_frame_locked = True

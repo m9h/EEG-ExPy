@@ -153,6 +153,59 @@ The sample `smoke_brainflow.py` and `smoke_window.py` scripts are in
 the project tree at ``~/dev/eeg-expy/`` (outside the repo) — copy or
 adapt them as needed.
 
+Recording to XDF with LabRecorder
+---------------------------------
+
+For sessions where the recording should also produce a canonical XDF
+file (for MNELAB browsing, ``mne.io.read_raw_xdf``, or lab-level
+archival), run `LabRecorder
+<https://github.com/labstreaminglayer/App-LabRecorder/releases>`_
+alongside the paradigm.
+
+Setup once
+^^^^^^^^^^
+
+Download a Linux build of LabRecorder from the release page and put
+it on your ``PATH``. On Fedora it's a single statically-linked
+executable; no packaging needed.
+
+Workflow per session
+^^^^^^^^^^^^^^^^^^^^
+
+#. Launch LabRecorder **before** the paradigm::
+
+       LabRecorder &
+
+#. Construct the ``EEG`` object with ``publish_to_lsl=True``. From
+   a script::
+
+       from eegnb.devices.eeg import EEG
+       from eegnb.experiments import VisualFPVSStothart
+
+       eeg = EEG(device="unicorn", publish_to_lsl=True)
+       exp = VisualFPVSStothart(duration=173, eeg=eeg)
+       exp.run(instructions=False)
+
+   Via the CLI, ``--publish-to-lsl`` on ``eegnb runexp`` does the same.
+
+#. In LabRecorder's stream list, tick both streams:
+
+   * ``BrainFlow-EEG-unicorn`` — 8-ch EEG, 250 Hz.
+   * ``BrainFlow-Markers-unicorn`` — irregular int32 markers.
+
+#. Click **Start** in LabRecorder, then start the paradigm. When the
+   paradigm finishes, click **Stop**. The resulting ``.xdf`` file
+   contains both streams, synchronised by LSL's cross-stream clock.
+
+Post-session
+^^^^^^^^^^^^
+
+Load the XDF into MNELAB for offline browsing (the import path handles
+markers as annotations automatically), or into a script via::
+
+    from mne.io import read_raw_xdf
+    raw = read_raw_xdf("session.xdf")
+
 Known issues
 ------------
 

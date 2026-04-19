@@ -6,6 +6,7 @@ from eegnb.datasets.datasets import zip_data_folders
 
 from .introprompt import intro_prompt, analysis_intro_prompt
 from .utils import run_experiment
+from .bids_cmd import to_bids_cmd
 from eegnb import generate_save_fn
 from eegnb.devices.eeg import EEG
 from eegnb.analysis.utils import check_report
@@ -18,6 +19,9 @@ from typing import Optional
 def main():
     """eeg-notebooks command line interface"""
     pass
+
+
+main.add_command(to_bids_cmd)
 
 
 @main.command()
