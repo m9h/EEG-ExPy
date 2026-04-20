@@ -19,6 +19,13 @@ _PARADIGMS = {
     "AuditoryOddball": ("eegnb.experiments.auditory_oddball.aob", "AuditoryOddball"),
     "VisualFPVSStothart": ("eegnb.experiments.fpvs_stothart.stothart", "VisualFPVSStothart"),
     "VisualFPVSRossion": ("eegnb.experiments.fpvs_rossion.rossion", "VisualFPVSRossion"),
+    # ERP CORE battery (Kappenman & Luck 2021).
+    "VisualERPCoreN170": ("eegnb.experiments.erp_core.n170_faces_cars", "VisualERPCoreN170"),
+    "AuditoryERPCoreMMN": ("eegnb.experiments.erp_core.mmn", "AuditoryERPCoreMMN"),
+    "VisualERPCoreN2pc": ("eegnb.experiments.erp_core.n2pc", "VisualERPCoreN2pc"),
+    "VisualERPCoreN400": ("eegnb.experiments.erp_core.n400", "VisualERPCoreN400"),
+    "VisualERPCoreP3": ("eegnb.experiments.erp_core.p3_oddball", "VisualERPCoreP3"),
+    "VisualERPCoreFlanker": ("eegnb.experiments.erp_core.flanker", "VisualERPCoreFlanker"),
 }
 
 __all__ = list(_PARADIGMS) + ["Experiment"]

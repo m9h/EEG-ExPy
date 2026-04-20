@@ -80,6 +80,16 @@ Build
 
 * **FPVS paradigm classes** — Stothart and Rossion — as Python
   subclasses of ``BaseExperiment``.
+* **ERP CORE paradigm suite** — all six canonical tasks from
+  Kappenman & Luck 2021 (N170, MMN, N2pc, N400, P3, ERN/LRP flanker)
+  as ``BaseExperiment`` subclasses in ``eegnb.experiments.erp_core``,
+  each exposing BIDS-EEG metadata for standards-compliant export.
+  Four of six use procedural stimuli (tones, colour-gap squares,
+  letters, arrow strings); N170 falls back to the bundled
+  ``FACE_HOUSE`` photos with phase-scrambled distractors (supply
+  ``faces_dir`` / ``cars_dir`` to point at Kappenman's OSF stimulus
+  set, https://osf.io/thsqg/); N400 ships a minimal
+  ``word_pairs_erp_core.csv``.
 * **Frequency-tagged analysis** — narrow-band SNR, harmonic summation,
   collision checking against subject baseline peaks.
 * **Design-validation tooling** — ``eegnb tune``, dry-electrode power
