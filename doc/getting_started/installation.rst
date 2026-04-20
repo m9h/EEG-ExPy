@@ -205,6 +205,34 @@ In windows, if the above is causing errors, the following commands may help:
    $ conda install ipykernel
 
 
+**liblsl fails to load under Anaconda Python on Linux:**
+
+If ``import pylsl`` (or anything that uses LSL, including ``muselsl`` and the
+``eegnb`` CLI) fails with an error like::
+
+   OSError: .../libstdc++.so.6: version `GLIBCXX_3.4.30' not found
+       (required by .../pylsl/lib/liblsl.so)
+
+the Anaconda-shipped ``libstdc++.so.6`` is older than what the bundled
+``liblsl`` was built against. Two workarounds, in order of preference:
+
+1. Use a ``uv``-managed Python or a system Python instead of the Anaconda
+   interpreter for the virtualenv::
+
+      uv python install 3.12
+      uv venv --python 3.12
+      uv pip install -e '.[streamstim]'
+
+2. Force the loader to prefer the system ``libstdc++`` (only a good idea if
+   your distro's version is new enough — check with
+   ``strings /usr/lib64/libstdc++.so.6 | grep GLIBCXX_3.4.30``)::
+
+      LD_LIBRARY_PATH=/usr/lib64 python -c "import pylsl"
+
+The ``conda install -c conda-forge libstdcxx-ng`` route also works if you
+must stay inside the Anaconda stack.
+
+
 Bug reports
 -----------
 

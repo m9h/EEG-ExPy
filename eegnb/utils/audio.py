@@ -18,9 +18,15 @@ import platform
 def configure_audio_backend() -> str:
     """Pick the best available PsychoPy audio backend.
 
-    Returns the name of the backend that was configured.
+    Returns the name of the backend that was configured, or ``"unavailable"``
+    if PsychoPy itself is not importable (e.g. headless analysis-only installs
+    that skip the ``[stimpres]`` extra). Callers that actually present stimuli
+    will hit a clearer error when they try to construct a Window or Sound.
     """
-    from psychopy import prefs
+    try:
+        from psychopy import prefs
+    except ImportError:
+        return "unavailable"
 
     system = platform.system()
     machine = platform.machine()
