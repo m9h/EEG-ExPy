@@ -5,24 +5,29 @@ Design doc: `labstreamer.md` (same folder). Read that first.
 
 ## Phase 1 — input path (timing-audit MVP)
 
-- [ ] `eegnb/devices/labstreamer.py`: `LabStreamerSession` with mDNS +
-      env-var fallback, Socket.IO v3 client, backoff reconnect.
-- [ ] `LabStreamerMarkers`: port the device's threshold/direction/debounce
-      logic from firmware 1.2.5 JS (`/main.js` on the device at
-      `http://LabStreamer.local:3000/main.js`). Re-run detection in Python on
-      the `data` stream.
-- [ ] `pylsl.StreamOutlet` for markers, 4 channels, irregular rate, JSON
-      payload with device-clock timestamps.
-- [ ] `tests/test_labstreamer.py`: unit tests with a mocked Socket.IO server
-      and recorded `data` event samples. Include replay of a synthetic
-      photodiode burst, confirm outlet receives one marker.
+Architecture changed 2026-04-24 after reading vendor docs: device is a native
+LSL source. We do **not** scrape Socket.IO for data or re-implement
+threshold detection. Socket.IO is configuration-only.
+
+- [ ] `eegnb/devices/labstreamer.py`: `LabStreamerControls` with mDNS +
+      env-var fallback, Socket.IO v3 client (`EIO=3`), backoff reconnect.
+      Methods: `get_controls`, `set_controls`, `acquire(bool)`, pulse helpers.
+- [ ] `LabStreamerLatencyInlet`: thin wrapper around `pylsl.resolve_byprop`
+      for the device's native `Latencies` outlet. Returns an inlet handle
+      that the recording session can subscribe to.
+- [ ] `tests/test_labstreamer.py`:
+      - Unit tests with a mocked Socket.IO server for the controls path.
+      - Integration test that publishes a fake `Latencies` outlet via pylsl
+        and confirms our inlet resolves and reads it.
 
 ## Phase 2 — CLI
 
 - [ ] `eegnb/cli/labstreamer_cmd.py`: `scan`, `status`, `set`, `bridge`,
-      `test-pulse`, `update`, `install-service`.
+      `test-pulse`, `touch-test`, `update`, `install-service`.
 - [ ] Wire the subcommand into `eegnb/cli/__main__.py`.
-- [ ] `scan` discovers via mDNS, prints firmware version + `loaded controls`.
+- [ ] `scan` discovers via mDNS, prints firmware version + `loaded controls`,
+      and lists which native LSL outlets (`Data`, `Latencies`, `Messages`)
+      are visible on the network.
 - [ ] `install-service`: template a systemd user unit running `bridge` at login.
 
 ## Phase 3 — timing-audit report
@@ -90,14 +95,16 @@ Design doc: `labstreamer.md` (same folder). Read that first.
 - Engine.IO v3 only. Do not use `python-socketio[client]` default v4 transport
   without pinning `EIO=3`.
 - Device's own trigger decisions are not emitted as discrete events over
-  Socket.IO in 1.2.5. Re-implement detection in Python against the sample
-  stream.
+  Socket.IO in 1.2.5 — but they **are** emitted on the device's native LSL
+  `Latencies` outlet. Subscribe over LSL, not Socket.IO.
 
 ## Nice-to-haves (not blocking merge)
 
-- [ ] Ingest the device's `latency` event (it self-reports jitter) and
-      surface in report.
+- [ ] Optional ingest of the raw `Data` LSL outlet (10 kHz × 6ch float32)
+      via `--with-labstreamer-raw`, for offline re-thresholding.
 - [ ] Expose `extStream` external-input path — useful if someone feeds the
       LabStreamer an extra channel (e.g., button box).
 - [ ] Wireless operation — device supports it but wired is more reliable for
       timing-critical work. Test later.
+- [ ] USB-A power port (5 V / 2 A out): document as a power source for an
+      external photodiode amp / button box. Not a data interface.

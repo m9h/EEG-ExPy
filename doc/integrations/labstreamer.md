@@ -53,15 +53,37 @@ number with a distribution. Over time the profile catalog becomes a reference
 that tells a new user whether their laptop is good enough for a given paradigm
 before they collect any data.
 
-## Context snapshot (captured 2026-04-22)
+## Context snapshot (captured 2026-04-22, vendor docs read 2026-04-24)
 
 - Device on lab LAN: `LabStreamer.local` → `192.168.108.18` (MAC `00:c0:08:93:57:d3`, MOXA OUI)
 - Firmware: software `1.2.5`, hardware `1.1.0` (freshly updated from `1.1.1`)
-- Web UI / API: `http://LabStreamer.local:3000/` — Node + Express serving HTML,
-  Socket.IO (Engine.IO v3) as the only live data transport. No auth.
+- Web UI: `http://LabStreamer.local:3000/` — Node + Express serving HTML,
+  Socket.IO (Engine.IO v3) as the **controls** transport. No auth.
+- **LSL outlets (data path):** the device is a native LSL source. See next
+  subsection. The Socket.IO transport is *only* for configuration and TTL
+  output — not the data path.
 - mDNS advertisement: `_workstation._tcp` on port 9 (cosmetic; real service is 3000)
 
-### Device control surface (Socket.IO)
+### Native LSL outlets
+
+Per vendor docs (`Stream Specifications`, NBS LabStreamer manual,
+`https://www.neurobs.com/manager/content/docs/labstreamer/index.html`), the
+device publishes three LSL streams whenever acquisition is active:
+
+| Outlet | Format | Use here |
+|---|---|---|
+| `Data` | 10 kHz, 6 channel float32 (timestamped) | Raw signal. Optional ingest — bulky, lets us re-threshold offline. |
+| `Latencies` | irregular, JSON event per threshold crossing | **Primary marker source** for the timing audit. One event per detected flash/tone/touch with device-clock timestamp at < 0.1 ms accuracy. |
+| `Messages` | irregular, string events / errors | Diagnostics only. |
+
+Sampling and timing specs (vendor `Features`): 10 kHz parallel input,
+0.1 ms measurement accuracy, < 1 sample (< 0.1 ms) hardware threshold latency.
+
+Because LSL clock-offset estimation is built in, the LabStreamer streams
+align automatically with the EEG stream and the paradigm marker stream in
+the same XDF — no custom time alignment in our code.
+
+### Device control surface (Socket.IO, configuration only)
 
 Observed event names on firmware 1.2.5:
 
@@ -85,68 +107,89 @@ unlocks something the bridge should expose):
 | `thresholdCrossingMinActive`, `thresholdCrossingMinInactive` | Debounce windows | Configure via CLI, don't hardcode |
 | `triggerStream` | Bind channel to output stream | Output routing |
 
-Default channel config on this device: analog ch0 = `white` (photodiode),
-ch1 = `sound`, ch2/ch4 = unused. Thresholds midscale (2047 on a 12-bit ADC),
-pre/post windows 10 ms / 500 ms.
+Default channel config on this device: channel A = `Photo` (photodiode),
+B = `Audio`, C/D = analog spare. Pre/post windows 10 ms / 500 ms.
 
 ## Architecture
 
-Two classes in `eegnb/devices/labstreamer.py`, sharing one Socket.IO connection
-owned by a `LabStreamerSession` context manager. Separation keeps the input
-path (which is always-on in timing-audit mode) from the output path (which
-is opt-in and amp-specific).
+Three small components in `eegnb/devices/labstreamer.py`, plus the timing
+audit. The data path goes over LSL (device → pylsl inlet → XDF). Socket.IO
+is only used for configuration and the TTL output path.
 
 ```
 eegnb/devices/labstreamer.py
-    LabStreamerSession(host, port=3000)   # socket.io connection, event pump
-    LabStreamerMarkers(session, channels) # INPUT: data events → LSL outlet
-    LabStreamerTrigger(session, pulse_ms) # OUTPUT: paradigm call → TTL pulse
+    LabStreamerControls(host, port=3000)  # CONFIG (Socket.IO): get/set controls,
+                                          #   acquire on/off, threshold, filter,
+                                          #   pulse params. Not in data path.
+    LabStreamerLatencyInlet(stream_name)  # INPUT (LSL): wraps the device's native
+                                          #   `Latencies` outlet, exposes events
+                                          #   to the recording session.
+    LabStreamerTrigger(controls, ...)     # OUTPUT (Socket.IO `controls`):
+                                          #   paradigm call → TTL pulse on
+                                          #   D0–D7 via pulseValue/pulseActive.
 eegnb/cli/labstreamer_cmd.py              # `eegnb labstreamer ...`
 eegnb/reports/timing_audit.py             # post-run timing diff + report block
 tests/test_labstreamer.py                 # unit + integration tests
 doc/integrations/labstreamer.md           # (this file)
 ```
 
-### `LabStreamerSession`
+### `LabStreamerControls` (Socket.IO)
 
-Thin wrapper over `python-socketio.Client`. Handles:
+Thin wrapper over `python-socketio.Client`, scoped to configuration only.
 - mDNS-resolve `LabStreamer.local` (fallback to env var `LABSTREAMER_HOST` or IP).
 - Engine.IO v3 (the device is stuck on v3 — verified against firmware 1.2.5).
 - Reconnect with backoff. Network hiccups must not crash the experiment runner.
-- Pub/sub dispatch so `LabStreamerMarkers` and `LabStreamerTrigger` can attach.
-- Exposes `get_controls() -> dict` and `set_controls(dict)` for CLI tooling.
+- Exposes `get_controls() -> dict`, `set_controls(dict)`, `acquire(bool)`,
+  and pulse helpers for `LabStreamerTrigger`.
 
-### `LabStreamerMarkers` — input path (always on in audit mode)
+### `LabStreamerLatencyInlet` — input path
 
-1. On start: verify `acquire=true` via `set_controls`.
-2. Subscribe to `data` events. Replay the device's threshold / direction /
-   debounce logic in Python against the sample stream so what the scope *shows*
-   as a trigger is what we *emit* as a marker. (We cannot just rely on the
-   device's own trigger decisions; those do not arrive as discrete events over
-   Socket.IO in firmware 1.2.5 — they appear only in the live display stream.)
-3. Publish a `pylsl.StreamOutlet`:
-   - `name="LabStreamer"`, `type="Markers"`, `channel_count=4`,
-     `nominal_srate=IRREGULAR_RATE`, `channel_format=cft_string`.
-   - Channel labels: `["ch0_photodiode", "ch1_sound", "ch2", "ch3"]`.
-   - Marker payload: JSON string with `{channel, direction, sample_index,
-     device_ts}` so downstream can reconstruct device-clock timestamps.
-4. On stop: clean disconnect, flush outlet.
+The device already publishes threshold-crossing events on its `Latencies` LSL
+outlet, so we do not re-implement detection. We just resolve the stream and
+let LabRecorder (or our own pylsl-based recorder) write it into the XDF
+alongside EEG and paradigm markers.
+
+1. On bridge start: `LabStreamerControls.acquire(True)` so the device is live.
+2. Resolve the LSL `Latencies` outlet by name (or by source-id matching the
+   device's hostname). Wait up to N seconds; warn if missing.
+3. No re-publishing needed — the inlet is already an LSL stream. Our job is
+   to make sure the XDF recording session is subscribed to it.
+4. On bridge stop: `acquire(False)`, release the inlet handle.
+
+The device's `Data` outlet (10 kHz raw) is *not* ingested by default — too
+much volume for routine runs. Optional flag `--with-labstreamer-raw` writes
+it into the XDF for sessions where we want to re-threshold offline.
 
 ### `LabStreamerTrigger` — output path (opt-in, amp-aware)
+
+Per the vendor `Oscilloscope Control Panel - Digital` section, the device
+exposes three output modes on D0–D7: **Threshold Crossing** (D0–D3 follow
+A–D triggers), **On-Demand** (host writes 0–255 to D0–D7), and **Pulse**
+(host arms width + active/inactive levels). We use On-Demand + Pulse.
 
 1. On construction, take:
    - Pulse width (ms), active level, idle level.
    - Amp type (for documentation and warnings only — it does not talk to the amp).
 2. `push(marker: int | str)` emits via Socket.IO `controls` channel:
-   - Set `pulseValue` to the marker code (device supports 8-bit values in
-     digital mode; analog pulse carries timing but no code bits).
+   - Set `pulseValue` to the marker code (8-bit on D0–D7).
    - Toggle `pulseActive` for `pulse_ms`, then back to `pulseInactive`.
 3. Thread-safe: `push` is safe to call from paradigm main thread. Uses the
-   session's eventloop.
+   `LabStreamerControls` event loop.
 4. Not a replacement for the LSL markers outlet. The paradigm should push the
    marker **both** to the existing LSL outlet (for software-clock record) and
    to `LabStreamerTrigger` (for amp sample-clock record). The timing-audit
    compares the two.
+
+### Touch generator (response-side audit)
+
+The device has a relay that shorts the **Touch** banana input to ground when
+the host writes the relevant control — the vendor documents this under
+`Touch and Button Pushing Measurements`. With a snap electrode connected to
+a touchscreen, a relay closure registers as a finger touch. Useful for
+closed-loop / BCI paradigms that take touch input: fire synthetic touches
+at known times, measure host-side event arrival latency. Exposed as
+`eegnb labstreamer touch-test` (rig profiling), not wired into `runexp` by
+default.
 
 ### Timing-audit report
 
@@ -154,8 +197,9 @@ Post-run, `eegnb runexp` (with `--with-labstreamer`) generates a timing block
 in the pweave report (`eegnb/reports/templates/report.Pnw`):
 
 - Paired diff: for each paradigm marker, find the nearest LabStreamer
-  photodiode (or sound) marker within a configurable window, compute
-  `dt = ls_photodiode_ts - paradigm_marker_ts`.
+  `Latencies` event on the photodiode (or audio) channel within a
+  configurable window, compute `dt = ls_event_ts - paradigm_marker_ts`. Both
+  timestamps come out of the XDF on a common LSL clock — no manual alignment.
 - Summary stats: mean, median, std, 5/95 pct, max. Histogram.
 - Pass/fail against a paradigm-level tolerance. N170 wants ≤ 5 ms std; FPVS
   wants ≤ 2 ms. Tolerances live in `eegnb/paradigms/fsl_timing.py`.
@@ -177,11 +221,12 @@ warn (not fail) if the amp-side config does not expect it.
 ## CLI surface
 
 ```
-eegnb labstreamer scan             # mDNS discovery + print version + controls
+eegnb labstreamer scan             # mDNS discovery + print version + controls + LSL outlets seen
 eegnb labstreamer status           # live read of device state
 eegnb labstreamer set K=V ...      # poke controls (threshold, debounce, etc.)
-eegnb labstreamer bridge           # run standalone bridge (input path only)
-eegnb labstreamer test-pulse       # fire a single pulse (for wiring tests)
+eegnb labstreamer bridge           # ensure acquire=on and the Latencies LSL outlet is up
+eegnb labstreamer test-pulse       # fire a single TTL pulse (for wiring tests)
+eegnb labstreamer touch-test       # fire N synthetic touches at known intervals (response-side rig audit)
 eegnb labstreamer update --to X    # firmware update via `version-select`
 eegnb labstreamer install-service  # systemd user unit for always-on bridge
 ```
@@ -214,18 +259,23 @@ in the TODO).
 
 ## Failure modes and handling
 
-1. **Device disappears mid-run.** `LabStreamerSession` reconnects in the
-   background; the runner keeps going. Report flags the gap but does not
-   abort the experiment.
+1. **Device disappears mid-run.** `LabStreamerControls` reconnects in the
+   background; the runner keeps going. The LSL `Latencies` inlet drops
+   silently — pylsl will resume when the outlet reappears. Report flags the
+   gap but does not abort the experiment.
 2. **Port 3000 refused after firmware update.** Reproduced 2026-04-22:
    1.1.1 → 1.2.5 install never restarted the Node service. Required a power
    cycle; LEDs went all solid, no flash-write blink. Fix: document this in
    the `update` CLI subcommand and warn user to wait ≥ 10 min, then pinhole
    reset, then power cycle as last resort.
 3. **Threshold noise on photodiode.** `thresholdCrossingMinActive` debounce
-   is per-device; calibrate during `eegnb labstreamer scan` against ambient.
+   is set on the device (vendor controls); calibrate during
+   `eegnb labstreamer scan` against ambient.
 4. **TTL output miswired.** `test-pulse` subcommand exists to fire a single
    pulse while the user watches the amp's input channel.
+5. **LSL `Latencies` outlet not advertised.** Means acquisition isn't on.
+   `LabStreamerControls.acquire(True)` first; if still missing, check the
+   device's network config (the outlet binds to the same NIC as the web UI).
 
 ## Scope and non-goals
 
@@ -236,16 +286,24 @@ in the TODO).
 **Out of scope (followups):**
 - Wireless bridging (device supports it; we have not tested it).
 - Beta firmware channel (`beta-versions`).
-- Histogram `latency` event ingestion (device self-reports jitter — nice to
-  have but not needed for v1).
+- Ingest of the raw `Data` LSL outlet by default (10 kHz × 6ch is bulky;
+  opt-in via `--with-labstreamer-raw`).
 - Multi-device coordination.
 
 ## References
 
-- Device API observed live; no vendor-published Socket.IO spec. Event names
-  extracted from the device's own `/main.js`.
-- Firmware 1.2.5 `loaded controls` schema captured in this doc's context
-  snapshot.
+- NBS LabStreamer manual (vendor docs, read 2026-04-24):
+  `https://www.neurobs.com/manager/content/docs/labstreamer/index.html`.
+  Source for: native LSL outlet specs (`Stream Specifications`), output modes
+  (`Oscilloscope Control Panel - Digital`), Touch behavior
+  (`Touch and Button Pushing Measurements`), USB-A power spec
+  (`Hardware Ports`).
+- Socket.IO control surface observed live; no vendor-published spec. Event
+  names extracted from the device's own `/main.js`. Firmware 1.2.5
+  `loaded controls` schema captured in this doc's context snapshot.
 - EEG-ExPy LSL marker outlet already implemented by commit `02b42dc` on
-  `morgan/modernize` — the LabStreamer outlet is an additional stream, not a
-  replacement.
+  `morgan/modernize` — the LabStreamer `Latencies` outlet is an additional
+  LSL stream that joins the EEG and paradigm-marker streams in the XDF.
+- BrainFlow → LSL bridge (same commit `02b42dc`) means this design works
+  identically whether the amp is LSL-native or fed via BrainFlow: every
+  stream in the recording is on a common LSL clock.
