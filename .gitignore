@@ -19,3 +19,6 @@ htmlcov
 .idea/
 
 **/.DS_Store
+
+# Local datasets & recordings (stimulus archives, EEG captures) — not for version control
+/data/
