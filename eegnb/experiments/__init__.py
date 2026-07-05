@@ -19,6 +19,7 @@ _PARADIGMS = {
     "AuditoryOddball": ("eegnb.experiments.auditory_oddball.aob", "AuditoryOddball"),
     "VisualFPVSStothart": ("eegnb.experiments.fpvs_stothart.stothart", "VisualFPVSStothart"),
     "VisualFPVSRossion": ("eegnb.experiments.fpvs_rossion.rossion", "VisualFPVSRossion"),
+    "VisualRSVPThings": ("eegnb.experiments.visual_rsvp_things.rsvp", "VisualRSVPThings"),
     # ERP CORE battery (Kappenman & Luck 2021).
     "VisualERPCoreN170": ("eegnb.experiments.erp_core.n170_faces_cars", "VisualERPCoreN170"),
     "AuditoryERPCoreMMN": ("eegnb.experiments.erp_core.mmn", "AuditoryERPCoreMMN"),

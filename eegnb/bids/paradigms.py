@@ -62,6 +62,28 @@ ROSSION = _meta(
 )
 
 
+RSVP_THINGS = _meta(
+    bids_task_name="rsvpThings",
+    bids_event_id={1: "imageOnset"},
+    bids_task_json={
+        "TaskName": "THINGS RSVP — natural-image EEG decoding",
+        "Instructions": (
+            "Fixate the central cross. Passively watch the rapid stream "
+            "of images; no response is required. Try not to blink during "
+            "a block."
+        ),
+        "TaskDescription": (
+            "Rapid serial visual presentation of unique natural object "
+            "images from the THINGS database, 100 ms on / 100 ms blank "
+            "(5 Hz), one marker per image onset. Image identity per onset "
+            "is recorded in a presentation-order sidecar, not in the "
+            "event code. Replicates the Alljoined-1.6M acquisition "
+            "protocol (arXiv 2508.18571) for EEG-to-image decoding."
+        ),
+    },
+)
+
+
 _ERP_CORE_CITATION = (
     "Kappenman, Farrens, Zhang, Stewart, & Luck (2021), NeuroImage "
     "225:117465. Stimulus specs and data: https://osf.io/thsqg/"
@@ -217,6 +239,7 @@ ERP_CORE_FLANKER = _meta(
 BY_NAME: dict[str, SimpleNamespace] = {
     "visual-fpvs-stothart": STOTHART,
     "visual-fpvs-rossion": ROSSION,
+    "visual-rsvp-things": RSVP_THINGS,
     "erp-core-n170": ERP_CORE_N170,
     "erp-core-mmn": ERP_CORE_MMN,
     "erp-core-n2pc": ERP_CORE_N2PC,
