@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import os
 from glob import glob
-from time import time
 
 from psychopy import visual
 from pandas import DataFrame
@@ -226,11 +225,7 @@ class VisualFPVSStothart(Experiment.BaseExperiment):
         label = int(self.trials["parameter"].iloc[idx])
         pool = self.deviants if label == 2 else self.standards
         image = pool[self._rng.integers(0, len(pool))]
-        image.draw()
-
-        if self.eeg:
-            self.eeg.push_sample(
-                marker=self.markernames[label], timestamp=time()
-            )
-
-        self.window.flip()
+        # Hold the image on-screen for every on-frame of this cycle. A plain
+        # draw()+flip() would show it for only one frame under the
+        # frame-locked loop (see BaseExperiment._show_persistent).
+        self._show_persistent(image, marker=self.markernames[label])

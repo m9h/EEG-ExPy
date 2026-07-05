@@ -25,7 +25,6 @@ from __future__ import annotations
 import os
 import re
 from glob import glob
-from time import time
 
 import numpy as np
 from pandas import DataFrame
@@ -193,14 +192,10 @@ class VisualFPVSRossion(Experiment.BaseExperiment):
             image = self.base_images[
                 self._rng.integers(0, len(self.base_images))
             ]
-        image.draw()
-
-        if self.eeg:
-            self.eeg.push_sample(
-                marker=self.markernames[label], timestamp=time()
-            )
-
-        self.window.flip()
+        # Hold the image across every on-frame of this cycle; a plain
+        # draw()+flip() would blank after one frame under the frame-locked
+        # loop (see BaseExperiment._show_persistent).
+        self._show_persistent(image, marker=self.markernames[label])
 
 
 def _gather_images(directory: str) -> list[str]:

@@ -76,6 +76,10 @@ class BaseExperiment(ABC):
         # Initializing the marker names
         self.markernames = [1, 2]
 
+        # Stimulus currently held on-screen via setAutoDraw (frame-locked
+        # paradigms). None when the screen is blank. See _show_persistent.
+        self._active_stim = None
+
         # Setting up the trial and parameter list
         self.parameter = np.random.binomial(1, 0.5, self.n_trials)
         self.trials = DataFrame(dict(parameter=self.parameter, timestamp=np.zeros(self.n_trials)))
@@ -111,15 +115,66 @@ class BaseExperiment(ABC):
         This is an optional method - the default implementation simply flips the window with no additional content.
         Subclasses can override this method to provide custom ITI graphics.
         """
+        # Release any stimulus being held on-screen by _show_persistent so
+        # the ITI is actually blank. No-op for time-based paradigms, which
+        # never set _active_stim.
+        if self._active_stim is not None:
+            self._active_stim.setAutoDraw(False)
+            self._active_stim = None
+        self.window.flip()
+
+    def _show_persistent(self, stim, marker=None):
+        """Present a stimulus so it stays on-screen across every window flip
+        until the next ITI frame — the correct primitive for the
+        frame-locked loop.
+
+        The frame-locked loop (``_run_frame_locked_trial_loop``) calls
+        ``present_stimulus`` only for the first on-frame and then issues bare
+        ``self.window.flip()`` calls for the remaining on-frames. Because
+        PsychoPy's ``flip()`` defaults to ``clearBuffer=True``, a stimulus
+        that was merely ``.draw()``-n once would be wiped after a single
+        frame, so a 6-frame stimulus would flash for ~1 frame and sit blank
+        for the other 5 — silently destroying the strict periodicity that
+        FPVS/SSVEP SNR analysis depends on. ``setAutoDraw(True)`` makes
+        PsychoPy re-blit the stimulus on every subsequent flip; the next
+        ``present_iti`` turns it back off.
+
+        Parameters
+        ----------
+        stim : psychopy.visual.BaseVisualStim
+            The stimulus to hold on-screen for this trial's on-frames.
+        marker : optional
+            Marker code to push at stimulus onset (only if an EEG device is
+            attached). Pushed immediately before the onset flip.
+        """
+        if self._active_stim is not None and self._active_stim is not stim:
+            self._active_stim.setAutoDraw(False)
+        stim.setAutoDraw(True)
+        self._active_stim = stim
+
+        if marker is not None and self.eeg:
+            self.eeg.push_sample(marker=marker, timestamp=time())
+
         self.window.flip()
 
     def setup(self, instructions=True):
         # Setting up Graphics
         self.window = (
             self.rift if self.use_vr
-            else visual.Window(self.window_size, monitor="testMonitor", units="deg", 
+            else visual.Window(self.window_size, monitor="testMonitor", units="deg",
                                screen = self.screen_num, fullscr=self.use_fullscr))
-        
+
+        # Request input focus. Some Wayland/XWayland compositors throttle an
+        # UNfocused surface to ~1 Hz, which silently destroys frame-locked
+        # timing (every flip blocks ~1 s waiting for a vblank callback the
+        # compositor withholds). A window launched detached/headless never
+        # gets focus on its own, so nudge the WM here. Guarded: no-op on
+        # backends without a pyglet winHandle (e.g. VR/Rift).
+        try:
+            self.window.winHandle.activate()
+        except Exception:
+            pass
+
         # Loading the stimulus from the specific experiment, throws an error if not overwritten in the specific experiment
         self.stim = self.load_stimulus()
         
