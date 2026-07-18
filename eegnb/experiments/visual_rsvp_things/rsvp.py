@@ -100,6 +100,9 @@ class VisualRSVPThings(Experiment.BaseExperiment):
         partition: str | None = "stim_train",
         seed: int = 1,
         image_size_deg: float = 10.0,
+        photodiode: bool = False,
+        photodiode_corner: str = "top-left",
+        photodiode_size: float = 0.2,
         use_vr: bool = False,
         use_fullscr: bool = True,
         screen_num: int = 0,
@@ -131,6 +134,10 @@ class VisualRSVPThings(Experiment.BaseExperiment):
         self.partition = partition
         self.seed = seed
         self.image_size_deg = image_size_deg
+        self.photodiode = photodiode
+        self.photodiode_corner = photodiode_corner
+        self.photodiode_size = photodiode_size
+        self.photodiode_patch = None
 
         self.markernames = {1: "imageOnset"}
         # Populated in load_stimulus: one row per trial in presentation order.
@@ -213,6 +220,38 @@ class VisualRSVPThings(Experiment.BaseExperiment):
         self.fixation = visual.TextStim(
             win=self.window, text="+", color=[1, 1, 1], height=1.0, units="deg"
         )
+
+        # Optional photodiode patch: a square in a screen corner that goes
+        # white for exactly the image on-frames and black for the blanks.
+        # A photodiode taped over it turns the true on-screen luminance
+        # transition into a signal we can timestamp externally — the only
+        # way to measure real marker-to-photon latency. It is always drawn
+        # (autoDraw) and only its fill colour toggles, so the black state
+        # gives maximum contrast against the white state.
+        if self.photodiode:
+            half = self.photodiode_size / 2.0
+            corners = {
+                "top-left": (-1 + half, 1 - half),
+                "top-right": (1 - half, 1 - half),
+                "bottom-left": (-1 + half, -1 + half),
+                "bottom-right": (1 - half, -1 + half),
+            }
+            if self.photodiode_corner not in corners:
+                raise ValueError(
+                    f"photodiode_corner must be one of {sorted(corners)}, "
+                    f"got {self.photodiode_corner!r}"
+                )
+            self.photodiode_patch = visual.Rect(
+                win=self.window,
+                width=self.photodiode_size,
+                height=self.photodiode_size,
+                pos=corners[self.photodiode_corner],
+                units="norm",
+                fillColor=[-1, -1, -1],
+                lineColor=None,
+            )
+            self.photodiode_patch.setAutoDraw(True)
+
         return self.stimuli
 
     def present_iti(self):
@@ -220,10 +259,16 @@ class VisualRSVPThings(Experiment.BaseExperiment):
         if self._active_stim is not None:
             self._active_stim.setAutoDraw(False)
             self._active_stim = None
+        if self.photodiode_patch is not None:
+            self.photodiode_patch.fillColor = [-1, -1, -1]  # black
         self.fixation.draw()
         self.window.flip()
 
     def present_stimulus(self, idx: int):
+        # Photodiode patch goes white on exactly the same flip as the image,
+        # so the light transition marks true stimulus onset.
+        if self.photodiode_patch is not None:
+            self.photodiode_patch.fillColor = [1, 1, 1]  # white
         # Hold the image for every on-frame of this cycle; a plain
         # draw()+flip() would blank after one frame under the frame-locked
         # loop (see BaseExperiment._show_persistent).
