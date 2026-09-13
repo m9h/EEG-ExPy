@@ -84,6 +84,50 @@ RSVP_THINGS = _meta(
 )
 
 
+RETINOTOPY_SSVEP = _meta(
+    bids_task_name="retinotopySsvep",
+    bids_event_id={
+        1: "upperLeft",
+        2: "upperRight",
+        3: "lowerLeft",
+        4: "lowerRight",
+        5: "multiplexBlock",
+    },
+    bids_task_json={
+        "TaskName": "SSVEP sector retinotopy — frequency-tagged visual field mapping",
+        "Instructions": (
+            "Keep your eyes fixed on the central dot for the whole block "
+            "and try not to blink. Flickering checkerboard patches will "
+            "appear around fixation; do not look at them directly — just "
+            "hold central fixation. No response is required."
+        ),
+        "TaskDescription": (
+            "Frequency-tagged steady-state visual evoked potential (SSVEP) "
+            "mapping of the visual field. Contrast-reversing checkerboard "
+            "patches are placed in visual-field sectors (four quadrants by "
+            "default), each reversing at a distinct frequency that is an "
+            "integer divisor of the monitor refresh rate (e.g. 15/12/10/"
+            "8.57 Hz on a 60 Hz display) so each tag lands in one FFT bin. "
+            "In multiplex mode all sectors flicker simultaneously and are "
+            "separated by their tag frequency; in sequential mode one "
+            "sector flickers per block and its scalp topography is read "
+            "directly. The SSVEP amplitude/phase at each tag, and its "
+            "scalp topography (upper vs lower field cruciform polarity "
+            "inversion at Oz, left vs right hemifield lateralization), "
+            "index coarse retinotopic position. This yields honest coarse "
+            "(quadrant/hemifield) retinotopy on a low-density occipital "
+            "montage; it is NOT population-receptive-field mapping, which "
+            "requires high-density EEG with individual anatomy, MEG with an "
+            "fMRI-derived forward model, or intracranial recordings. "
+            "SSVEP methods: Norcia, Appelbaum, Ales, Cottereau & Rossion "
+            "(2015) J Vision 15(6):4. Multifocal/retinotopic VEP context: "
+            "Baseler et al. (1994); Slotnick et al. (1999); Ales, Yates & "
+            "Norcia (2010) NeuroImage."
+        ),
+    },
+)
+
+
 _ERP_CORE_CITATION = (
     "Kappenman, Farrens, Zhang, Stewart, & Luck (2021), NeuroImage "
     "225:117465. Stimulus specs and data: https://osf.io/thsqg/"
@@ -240,6 +284,7 @@ BY_NAME: dict[str, SimpleNamespace] = {
     "visual-fpvs-stothart": STOTHART,
     "visual-fpvs-rossion": ROSSION,
     "visual-rsvp-things": RSVP_THINGS,
+    "visual-retinotopy-ssvep": RETINOTOPY_SSVEP,
     "erp-core-n170": ERP_CORE_N170,
     "erp-core-mmn": ERP_CORE_MMN,
     "erp-core-n2pc": ERP_CORE_N2PC,
