@@ -128,6 +128,63 @@ RETINOTOPY_SSVEP = _meta(
 )
 
 
+PATTERN_REVERSAL_VEP = _meta(
+    bids_task_name="patternReversalVep",
+    bids_event_id={1: "reversal"},
+    bids_task_json={
+        "TaskName": "Pattern-reversal VEP — checkerboard",
+        "Instructions": (
+            "Keep your eyes fixed on the central dot and try not to blink "
+            "while the checkerboard is reversing. No response is required."
+        ),
+        "TaskDescription": (
+            "Binocular full-field black/white checkerboard that reverses "
+            "contrast at a fixed rate (2 reversals/s by default; 1 deg "
+            "checks) at constant mean luminance. Each reversal is marked. "
+            "Elicits the transient N75-P100-N145 complex over occipital "
+            "cortex, with the P100 the robust, clinically standardized "
+            "peak (~100 ms). Follows the ISCEV clinical VEP standard and "
+            "serves as a fast electrode/signal sanity check. A separate "
+            "stereoscopic/monocular VR variant lives in "
+            "eegnb.experiments.visual_vep.pattern_reversal_vep."
+        ),
+    },
+)
+
+
+FACE_SPACE = _meta(
+    bids_task_name="faceSpaceDistinctiveness",
+    bids_event_id={1: "level0mean", 2: "level1", 3: "level2veridical", 4: "level3caricature"},
+    bids_task_json={
+        "TaskName": "Face-space distinctiveness continuum",
+        "Instructions": (
+            "Fixate the central cross. Faces will appear one at a time; "
+            "watch each one. Depending on the configured task, either "
+            "passively view or make the requested judgment."
+        ),
+        "TaskDescription": (
+            "Norm-based face-space paradigm. Face identities are presented "
+            "at graded distances from the average (norm) face: a morph "
+            "coefficient of 0 is the average, 1 the veridical identity, and "
+            ">1 a caricature (identity vector extrapolated beyond the "
+            "original). The event code indexes the distance-from-mean "
+            "level; per-trial identity and coefficient are written to a "
+            "presentation-order sidecar. Distance from the norm modulates "
+            "the P200 (typicality), N250 (distinctiveness/encoding) and "
+            "N170; caricatures/distinctive faces yield larger identity "
+            "responses. Stimuli are supplied pre-rendered (e.g. webmorphR "
+            "or a 3D morphable model) or built by the fallback as a "
+            "pixel-space morph toward the average of a supplied face set "
+            "(crude, clearly not shape-normalized). Face-space theory: "
+            "Valentine (1991); norm-based coding and identity aftereffects: "
+            "Leopold et al. (2001), Rhodes & Jeffery (2006); "
+            "distinctiveness/caricature ERPs: Schulz, Kaufmann & "
+            "Schweinberger (2012); norm-based fMRI: Loffler et al. (2005)."
+        ),
+    },
+)
+
+
 _ERP_CORE_CITATION = (
     "Kappenman, Farrens, Zhang, Stewart, & Luck (2021), NeuroImage "
     "225:117465. Stimulus specs and data: https://osf.io/thsqg/"
@@ -285,6 +342,8 @@ BY_NAME: dict[str, SimpleNamespace] = {
     "visual-fpvs-rossion": ROSSION,
     "visual-rsvp-things": RSVP_THINGS,
     "visual-retinotopy-ssvep": RETINOTOPY_SSVEP,
+    "visual-pattern-reversal": PATTERN_REVERSAL_VEP,
+    "visual-face-space": FACE_SPACE,
     "erp-core-n170": ERP_CORE_N170,
     "erp-core-mmn": ERP_CORE_MMN,
     "erp-core-n2pc": ERP_CORE_N2PC,

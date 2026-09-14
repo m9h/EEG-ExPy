@@ -12,6 +12,7 @@ def get_experiments():
     from eegnb.experiments import AuditoryOddball
     from eegnb.experiments import VisualFPVSStothart, VisualFPVSRossion, VisualRSVPThings
     from eegnb.experiments import VisualRetinotopySSVEP
+    from eegnb.experiments import VisualPatternReversalVEP, VisualFaceSpace
     from eegnb.experiments.visual_cueing import cueing
     from eegnb.experiments.visual_codeprose import codeprose
     from eegnb.experiments.auditory_oddball import diaconescu
@@ -32,6 +33,8 @@ def get_experiments():
         "visual-fpvs-rossion": VisualFPVSRossion,
         "visual-rsvp-things": VisualRSVPThings,
         "visual-retinotopy-ssvep": VisualRetinotopySSVEP,
+        "visual-pattern-reversal": VisualPatternReversalVEP,
+        "visual-face-space": VisualFaceSpace,
     }
 
 

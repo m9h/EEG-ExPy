@@ -21,6 +21,8 @@ _PARADIGMS = {
     "VisualFPVSRossion": ("eegnb.experiments.fpvs_rossion.rossion", "VisualFPVSRossion"),
     "VisualRSVPThings": ("eegnb.experiments.visual_rsvp_things.rsvp", "VisualRSVPThings"),
     "VisualRetinotopySSVEP": ("eegnb.experiments.visual_retinotopy.retinotopy", "VisualRetinotopySSVEP"),
+    "VisualPatternReversalVEP": ("eegnb.experiments.visual_pattern_reversal.pattern_reversal", "VisualPatternReversalVEP"),
+    "VisualFaceSpace": ("eegnb.experiments.visual_face_space.face_space", "VisualFaceSpace"),
     # ERP CORE battery (Kappenman & Luck 2021).
     "VisualERPCoreN170": ("eegnb.experiments.erp_core.n170_faces_cars", "VisualERPCoreN170"),
     "AuditoryERPCoreMMN": ("eegnb.experiments.erp_core.mmn", "AuditoryERPCoreMMN"),
