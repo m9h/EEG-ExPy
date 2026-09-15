@@ -10,6 +10,31 @@ The N170 is an ERP specifically related to the perception of faces. This was val
 ### SSVEP
 The steady state visual evoked potential is a frequency response produced visual stimulation at specific frequencies. It was validated by Hubert in a 12 minute experiment (6 x 2 minute trials). Stimulation frequencies of 30hz and 20hz were used and an extra electrode at POz was added. Found clear peaks in the PSD at the stimulation frequencies. The peaks were most significant at the extra electrode, which is closest to the primary visual regions, but was detectable at all electrodes and found to have remarkably high accuracy when using a filter bank approach to isolate specific frequencies.
 
+## Modernization-line paradigms
+
+These are the newer `BaseExperiment` paradigms on the `morgan/modernize` line, launchable by their CLI key. Each carries BIDS-EEG metadata (`eegnb.bids.paradigms`) and, for the frequency-tagged ones, has an analysis counterpart in `eegnb.analysis.frequency_tagging` (per-tag SNR, harmonic sum, per-sector topography) alongside the design-side `eegnb.analysis.power`.
+
+### THINGS RSVP — `visual-rsvp-things`
+Rapid serial visual presentation of unique natural-object images from the THINGS database at 5 Hz (100 ms on / 100 ms blank), one marker per image onset, for EEG-to-image decoding. Replicates the Alljoined-1.6M acquisition protocol. Every image is unique, so identity per onset is written to a presentation-order sidecar CSV rather than the event code. Frame-locked presentation; optional photodiode patch for timing validation.
+
+### FPVS Fastball (Stothart) — `visual-fpvs-stothart`
+Fast periodic visual stimulation object-recognition oddball: standards at a 3 Hz base rate with a deviant every 5th item (0.6 Hz). Analysis is frequency-domain (SNR at 0.6 Hz and harmonics). Falls back to the bundled N170 face/house images for out-of-the-box smoke tests.
+
+### FPVS Face Individuation (Rossion) — `visual-fpvs-rossion`
+FPVS face-identity oddball (Liu-Shuang, Norcia & Rossion 2014): a base face identity repeated at 5.88 Hz with a novel identity every 5th item (1.176 Hz). The oddball-frequency response indexes neural face individuation, maximal at right occipito-temporal sites.
+
+### SSVEP Sector Retinotopy — `visual-retinotopy-ssvep`
+Frequency-tagged visual-field mapping: contrast-reversing checkerboard patches in visual-field sectors (four quadrants by default), each reversing at a distinct integer-divisor frequency (15/12/10/8.57 Hz on a 60 Hz display). `multiplex` mode flickers all sectors at once (separated by frequency); `sequential` mode does one sector per block. The SNR and scalp topography at each tag index coarse (quadrant/hemifield) retinotopic position. This is coarse retinotopy, **not** pRF mapping.
+
+### Pattern-reversal VEP — `visual-pattern-reversal`
+Binocular full-field black/white checkerboard reversing at a fixed rate (2 reversals/s, 1° checks, ISCEV standard), each reversal marked. Elicits the transient N75–P100–N145 complex over occipital cortex; the robust P100 also makes it a fast electrode/signal sanity check.
+
+### Face-space distinctiveness — `visual-face-space`
+Norm-based face-space paradigm: face identities presented at graded distances from the average (norm) face (morph coefficient 0 = mean, 1 = veridical, >1 = caricature). The event code indexes the distance level; per-onset identity/coefficient go to a presentation-order sidecar. Modulates the P200 (typicality), N250 (distinctiveness) and N170. Reads a pre-rendered continuum (webmorphR / 3D morphable model) when supplied, else builds a pixel-space fallback by morphing a source face set toward/beyond its pixel mean.
+
+### ERP CORE suite — `erp-core-*`
+The six standardized ERP CORE paradigms (Kappenman & Luck 2021): N170 (faces/cars), MMN (auditory oddball), N2pc (visual search), N400 (semantic priming), P3 (active oddball), and ERN/LRP (arrow flanker).
+
 ## Old experiments
 ### Go/No-Go
 An experiment designed to investigate the event-related potentials that can be detected during a Go-No-Go Task, which measures executive, inhibitory control and sustained attention. The subject is rapidly presented with a sequence of circles and squares and is asked to indicate, by pressing the spacebar, whether a shape is a circle.
