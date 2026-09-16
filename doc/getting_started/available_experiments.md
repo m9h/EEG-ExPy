@@ -32,6 +32,12 @@ Binocular full-field black/white checkerboard reversing at a fixed rate (2 rever
 ### Face-space distinctiveness — `visual-face-space`
 Norm-based face-space paradigm: face identities presented at graded distances from the average (norm) face (morph coefficient 0 = mean, 1 = veridical, >1 = caricature). The event code indexes the distance level; per-onset identity/coefficient go to a presentation-order sidecar. Modulates the P200 (typicality), N250 (distinctiveness) and N170. Reads a pre-rendered continuum (webmorphR / 3D morphable model) when supplied, else builds a pixel-space fallback by morphing a source face set toward/beyond its pixel mean.
 
+### Sweep VEP — `visual-sweep-vep`
+Objective contrast-sensitivity / grating-acuity threshold (Norcia & Tyler 1985). A grating contrast-reverses at a fixed rate while either its contrast or spatial frequency is stepped monotonically across a range; the SSVEP at the reversal frequency rises out of the noise as the parameter passes threshold, and extrapolating the response-vs-parameter function to zero gives the threshold with no behavioural report. Each step onset is marked and the swept value per onset is written to a presentation-order sidecar. Analyse with `eegnb.analysis.frequency_tagging`.
+
+### Visual MMN — `visual-mmn`
+Passive visual oddball eliciting the visual mismatch negativity (Stefanics, Kremláček & Czigler 2014): a frequent standard and rare deviant differing in a single feature (orientation by default, or colour), with attention directed away from the stream. The deviant-minus-standard difference wave shows a posterior negativity ~150–350 ms indexing automatic visual change-detection. Reuses the constrained oddball sequence generator shared with the auditory ERP-CORE MMN. For a strict design, pair with an equiprobable control block to subtract stimulus-specific adaptation.
+
 ### ERP CORE suite — `erp-core-*`
 The six standardized ERP CORE paradigms (Kappenman & Luck 2021): N170 (faces/cars), MMN (auditory oddball), N2pc (visual search), N400 (semantic priming), P3 (active oddball), and ERN/LRP (arrow flanker).
 

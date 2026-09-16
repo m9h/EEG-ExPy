@@ -185,6 +185,62 @@ FACE_SPACE = _meta(
 )
 
 
+SWEEP_VEP = _meta(
+    bids_task_name="sweepVep",
+    bids_event_id={1: "sweepStepOnset"},
+    bids_task_json={
+        "TaskName": "Sweep VEP — objective contrast / acuity threshold",
+        "Instructions": (
+            "Keep your eyes on the central dot and try not to blink while "
+            "the pattern is flickering. No response is required."
+        ),
+        "TaskDescription": (
+            "Steady-state sweep VEP (Norcia & Tyler 1985). A grating "
+            "contrast-reverses at a fixed rate while one parameter — "
+            "contrast (contrast-sensitivity threshold) or spatial "
+            "frequency (grating-acuity threshold) — is stepped "
+            "monotonically across a range, each step held briefly. The "
+            "SSVEP amplitude at the reversal frequency rises out of the "
+            "noise as the parameter passes threshold; extrapolating the "
+            "response-vs-parameter function to zero gives an objective "
+            "threshold with no behavioural report. Each step onset is "
+            "marked with a single code; the swept value per onset is "
+            "recorded in a presentation-order sidecar. Analyse with "
+            "eegnb.analysis.frequency_tagging (SNR at the reversal "
+            "frequency per step)."
+        ),
+    },
+)
+
+
+VMMN = _meta(
+    bids_task_name="visualMmn",
+    bids_event_id={1: "standard", 2: "deviant"},
+    bids_task_json={
+        "TaskName": "Visual mismatch negativity (vMMN)",
+        "Instructions": (
+            "Keep your eyes on the central cross. Ignore the surrounding "
+            "pattern stream — it is task-irrelevant. (A central "
+            "fixation-change detection task can be added to hold attention "
+            "away from the stream.)"
+        ),
+        "TaskDescription": (
+            "Passive visual oddball: a frequent standard and a rare "
+            "deviant differing in a single feature (orientation by "
+            "default, or colour), presented while attention is directed "
+            "away from the stream. The deviant-minus-standard difference "
+            "wave yields the visual mismatch negativity, a posterior "
+            "negativity ~150-350 ms indexing automatic visual "
+            "change-detection / prediction error. For a strict design, "
+            "pair with an equiprobable control to separate genuine "
+            "deviance from stimulus-specific adaptation. Stefanics, "
+            "Kremlacek & Czigler (2014), Front Hum Neurosci; Czigler; "
+            "Kimura."
+        ),
+    },
+)
+
+
 _ERP_CORE_CITATION = (
     "Kappenman, Farrens, Zhang, Stewart, & Luck (2021), NeuroImage "
     "225:117465. Stimulus specs and data: https://osf.io/thsqg/"
@@ -344,6 +400,8 @@ BY_NAME: dict[str, SimpleNamespace] = {
     "visual-retinotopy-ssvep": RETINOTOPY_SSVEP,
     "visual-pattern-reversal": PATTERN_REVERSAL_VEP,
     "visual-face-space": FACE_SPACE,
+    "visual-sweep-vep": SWEEP_VEP,
+    "visual-mmn": VMMN,
     "erp-core-n170": ERP_CORE_N170,
     "erp-core-mmn": ERP_CORE_MMN,
     "erp-core-n2pc": ERP_CORE_N2PC,
