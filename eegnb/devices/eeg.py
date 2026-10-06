@@ -241,6 +241,38 @@ class EEG:
     #   BrainFlow functions  #
     ##########################
 
+    # Number of prepare_session() attempts and the gap between them. BLE
+    # boards (Muse, BrainBit) routinely refuse the first connection attempt
+    # while the adapter settles or the device finishes advertising, so a
+    # single try makes a working headset look broken.
+    CONNECT_RETRIES = 12
+    CONNECT_RETRY_DELAY_S = 1.4
+
+    def _prepare_session_with_retry(self):
+        """``prepare_session()`` with retries, for flaky BLE links.
+
+        Observed on a Muse 2 over native BLE: identical code connects on
+        attempt 1 one minute and attempt 2 the next. Retrying turns a
+        transient refusal into a short pause instead of a failed run.
+        Wired/synthetic boards normally succeed first try and never
+        notice this.
+        """
+        last_err = None
+        for attempt in range(1, self.CONNECT_RETRIES + 1):
+            try:
+                self.board.prepare_session()
+                if attempt > 1:
+                    print(f"Connected to {self.device_name} on attempt {attempt}.")
+                return
+            except Exception as exc:  # brainflow raises BrainFlowError
+                last_err = exc
+                if attempt < self.CONNECT_RETRIES:
+                    sleep(self.CONNECT_RETRY_DELAY_S)
+        raise RuntimeError(
+            f"could not connect to {self.device_name} after "
+            f"{self.CONNECT_RETRIES} attempts: {last_err}"
+        ) from last_err
+
     def _init_brainflow(self):
         """This function initializes the brainflow backend based on the input device name. It calls
         a utility function to determine the appropriate USB port to use based on the current operating system.
@@ -348,7 +380,7 @@ class EEG:
         # Initialize board_shim
         self.sfreq = BoardShim.get_sampling_rate(self.brainflow_id)
         self.board = BoardShim(self.brainflow_id, self.brainflow_params)
-        self.board.prepare_session()
+        self._prepare_session_with_retry()
 
         # Apply board configuration if provided
         if self.config:
